@@ -140,6 +140,7 @@ export class VolumeProfileStrategy implements IStrategyModule {
 
   getKeyLevels(data: OHLCVData): PriceLevel[] {
     const profile = this.buildVolumeProfile(data.bars.slice(-100));
+    if (profile.poc === 0) return [];
     return [
       { price: profile.poc, type: 'resistance', strength: 0.85, label: `POC ${profile.poc.toFixed(2)}` },
       { price: profile.vah, type: 'resistance', strength: 0.70, label: `VAH ${profile.vah.toFixed(2)}` },
