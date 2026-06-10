@@ -99,8 +99,29 @@ export class MarketDataService {
       });
     }
 
+    // Resample 60m bars into 2H or 4H
+    const resampledBars = timeframe === '2H' ? this.resample(bars, 2) :
+                          timeframe === '4H' ? this.resample(bars, 4) : bars;
+
     // Only slice if limit is explicitly small (analysis use case)
-    return { symbol, timeframe, bars: limit < 500 ? bars.slice(-limit) : bars };
+    return { symbol, timeframe, bars: limit < 500 ? resampledBars.slice(-limit) : resampledBars };
+  }
+
+  private resample(bars: OHLCV[], n: number): OHLCV[] {
+    const result: OHLCV[] = [];
+    for (let i = 0; i < bars.length; i += n) {
+      const chunk = bars.slice(i, i + n);
+      if (chunk.length === 0) continue;
+      result.push({
+        time: chunk[0].time,
+        open: chunk[0].open,
+        high: Math.max(...chunk.map(b => b.high)),
+        low: Math.min(...chunk.map(b => b.low)),
+        close: chunk[chunk.length - 1].close,
+        volume: chunk.reduce((s, b) => s + b.volume, 0),
+      });
+    }
+    return result;
   }
 
   async searchSymbols(query: string): Promise<Array<{ symbol: string; name: string; type: string; exchange: string }>> {
