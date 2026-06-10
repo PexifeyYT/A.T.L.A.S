@@ -90,7 +90,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           </div>
 
           <div className="text-xs text-tv-text-secondary border-t border-tv-border pt-3">
-            ⚠ API key stored locally in AppData. Never leaves your machine. Restart ATLAS after saving for the new key to activate AI analysis.
+            API key stored locally in AppData. Takes effect immediately — no restart needed.
           </div>
         </div>
       </div>
