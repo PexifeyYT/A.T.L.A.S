@@ -27,6 +27,20 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
 }) => {
   const [showSearch, setShowSearch] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [quote, setQuote] = useState<{ price: number; changePercent: number } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const poll = async () => {
+      try {
+        const r = await window.api.fetchLiveQuote(symbol);
+        if (active && r.success && r.data) setQuote({ price: r.data.price, changePercent: r.data.changePercent });
+      } catch {}
+    };
+    poll();
+    const interval = setInterval(poll, 15000);
+    return () => { active = false; clearInterval(interval); };
+  }, [symbol]);
 
   // Global hotkey: / or Ctrl+K opens search
   useEffect(() => {
@@ -72,6 +86,16 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
             </button>
           ))}
         </div>
+
+        {/* Live price in toolbar */}
+        {quote && (
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-tv-surface2 rounded border border-tv-border ml-2">
+            <span className="text-tv-text text-xs font-mono font-semibold">{quote.price.toFixed(2)}</span>
+            <span className={`text-xs font-mono ${quote.changePercent >= 0 ? 'text-tv-green' : 'text-tv-red'}`}>
+              {quote.changePercent >= 0 ? '+' : ''}{quote.changePercent.toFixed(2)}%
+            </span>
+          </div>
+        )}
 
         {/* Spacer */}
         <div className="flex-1" />

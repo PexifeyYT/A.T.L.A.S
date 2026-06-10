@@ -117,19 +117,48 @@ export class AnalysisFormatter {
   private generateStructureComment(result: AnalysisResult): string {
     const sig = result.primarySignal;
     const bullish = sig.direction === 'LONG';
+    const moduleCount = result.modulesAgreed.length;
 
-    if (bullish) {
-      return [
-        `Price exhibits bullish market structure with a series of higher highs`,
-        `and higher lows. Key demand zones remain intact. Smart money positioning`,
-        `favors long exposure at current levels with momentum confirming.`,
-      ].join(' ');
+    const confidencePct = (sig.confidence * 100).toFixed(0);
+    const hasSMC = result.modulesAgreed.includes('mod_smc');
+    const hasTJR = result.modulesAgreed.includes('mod_tjr');
+    const hasVol = result.modulesAgreed.includes('mod_volume_profile');
+    const hasMomentum = result.modulesAgreed.includes('mod_momentum');
+    const hasWyckoff = result.modulesAgreed.includes('mod_wyckoff');
+
+    const confWord = sig.confidence > 0.75 ? 'high-conviction' : sig.confidence > 0.60 ? 'moderate' : 'low-conviction';
+    const moduleWord = moduleCount >= 8 ? 'strong multi-module' : moduleCount >= 5 ? 'solid' : 'emerging';
+
+    const bullets: string[] = [];
+
+    // Primary explanation from the top module
+    if (sig.explanation && sig.explanation !== 'No clear directional confluence across modules') {
+      bullets.push(sig.explanation);
     }
 
-    return [
-      `Price exhibits bearish market structure with a series of lower highs`,
-      `and lower lows. Key supply zones are holding. Smart money positioning`,
-      `favors short exposure at current levels with momentum confirming weakness.`,
-    ].join(' ');
+    if (hasSMC && hasTJR) {
+      bullets.push(`Both SMC structure and TJR institutional framework aligned ${bullish ? 'bullish' : 'bearish'} — highest-weight confirmation`);
+    } else if (hasSMC) {
+      bullets.push(`Smart money structure ${bullish ? 'broken above key swing high (BOS)' : 'broke below key swing low (CHoCH)'} — institutional footprint visible`);
+    } else if (hasTJR) {
+      bullets.push(`TJR setup: HTF bias ${bullish ? 'uptrend' : 'downtrend'} with LTF ${bullish ? 'BOS' : 'CHoCH'} entry trigger confirmed`);
+    }
+
+    if (hasWyckoff) {
+      bullets.push(`Wyckoff ${bullish ? 'spring detected — accumulation phase complete, composite man repositioning long' : 'UTAD detected — distribution complete, weakness ahead'}`);
+    }
+
+    if (hasVol) {
+      const poc = result.keyLevels.find(l => l.label?.startsWith('POC'));
+      bullets.push(`Volume profile: price ${bullish ? 'reclaimed' : 'rejected'} POC${poc ? ` at $${poc.price.toFixed(2)}` : ''} — ${bullish ? 'bullish magnet above' : 'bearish gravity pulling lower'}`);
+    }
+
+    if (hasMomentum) {
+      bullets.push(`Momentum oscillators ${bullish ? '(RSI/MACD) oversold bounce or bullish crossover triggered' : '(RSI/MACD) overbought rejection or bearish crossover confirmed'}`);
+    }
+
+    const intro = `${moduleWord.charAt(0).toUpperCase() + moduleWord.slice(1)} ${confWord} ${bullish ? 'LONG' : 'SHORT'} setup — ${confidencePct}% module confidence (${moduleCount}/${13} modules aligned).`;
+
+    return intro + '\n\n' + bullets.map(b => `  • ${b}`).join('\n');
   }
 }

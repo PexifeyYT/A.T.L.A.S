@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PerformancePanel } from './PerformancePanel';
 import { ChatPanel } from './ChatPanel';
 
@@ -101,8 +101,6 @@ const WATCHLIST_SYMBOLS = [
 const WatchlistContent: React.FC = () => {
   const [prices, setPrices] = useState<Record<string, { price: number; changePercent: number }>>({});
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const fetchAll = useCallback(async () => {
     const updates: Record<string, { price: number; changePercent: number }> = {};
     await Promise.allSettled(
@@ -179,11 +177,6 @@ const InfoContent: React.FC<{ symbol: string }> = ({ symbol }) => {
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [symbol]);
-
-  const typeColor: Record<string, string> = {
-    Stock: 'text-tv-accent', ETF: 'text-tv-orange', Crypto: 'text-tv-green',
-    Futures: 'text-tv-text-secondary', Forex: 'text-purple-400', Unknown: 'text-tv-text-secondary',
-  };
 
   const up = (quote?.changePercent ?? 0) >= 0;
 
