@@ -505,17 +505,10 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
     const y = e.clientY - rect.top;
     const price = getPrice(y);
 
-    if (activeDrawingRef.current.points.length === 1) {
-      activeDrawingRef.current = {
-        ...activeDrawingRef.current,
-        points: [activeDrawingRef.current.points[0], { x, y, price }],
-      };
-    } else {
-      activeDrawingRef.current = {
-        ...activeDrawingRef.current,
-        points: [activeDrawingRef.current.points[0], { x, y, price }],
-      };
-    }
+    activeDrawingRef.current = {
+      ...activeDrawingRef.current,
+      points: [activeDrawingRef.current.points[0], { x, y, price }],
+    };
     redrawAll();
   }, [getPrice, redrawAll]);
 
