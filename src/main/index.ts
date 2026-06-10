@@ -14,6 +14,8 @@ import { ClassicalPatternsStrategy } from '../core/strategies/ClassicalPatternsS
 import { VolatilityStrategy } from '../core/strategies/VolatilityStrategy';
 import { IntermarketStrategy } from '../core/strategies/IntermarketStrategy';
 import { SentimentStrategy } from '../core/strategies/SentimentStrategy';
+import { SeasonalityStrategy } from '../core/strategies/SeasonalityStrategy';
+import { OrderFlowStrategy } from '../core/strategies/OrderFlowStrategy';
 import { OHLCVData, MarketContext } from '../core/types';
 
 let mainWindow: BrowserWindow | null = null;
@@ -22,7 +24,7 @@ let mainWindow: BrowserWindow | null = null;
 const analysisEngine = new AnalysisEngine();
 const dataFetcher = new DataFetcher();
 
-// Register strategies (11 total in Phase 5)
+// Register strategies (13 total in Phase 6)
 analysisEngine.registerStrategy(new SMCStrategy());
 analysisEngine.registerStrategy(new TJRStrategy());
 analysisEngine.registerStrategy(new WyckoffStrategy());
@@ -34,6 +36,8 @@ analysisEngine.registerStrategy(new ClassicalPatternsStrategy());
 analysisEngine.registerStrategy(new VolatilityStrategy());
 analysisEngine.registerStrategy(new IntermarketStrategy());
 analysisEngine.registerStrategy(new SentimentStrategy());
+analysisEngine.registerStrategy(new SeasonalityStrategy());
+analysisEngine.registerStrategy(new OrderFlowStrategy());
 
 const createWindow = () => {
   mainWindow = new BrowserWindow({
