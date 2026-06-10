@@ -60,7 +60,7 @@ export class OllamaService {
 
     if (this.anthropicKey) {
       this.available = true;
-      this.model = 'claude-haiku-4-5';
+      this.model = 'claude-haiku-4-5-20251001';
       console.log('ATLAS LLM: Claude API ready');
       return;
     }
@@ -95,7 +95,7 @@ export class OllamaService {
     this.anthropicKey = key;
     if (key) {
       this.available = true;
-      this.model = 'claude-haiku-4-5';
+      this.model = 'claude-haiku-4-5-20251001';
     }
   }
 

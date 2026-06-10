@@ -57,7 +57,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             <div className="mt-1.5 text-xs text-tv-text-secondary">
               Get your key at{' '}
               <span className="text-tv-accent">console.anthropic.com</span>
-              {' '}· Uses claude-haiku-4-5 (fast, cheap)
+              {' '}· Uses claude-haiku-4-5-20251001 (fast, cheap)
             </div>
           </div>
 
