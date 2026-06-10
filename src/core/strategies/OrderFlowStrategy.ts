@@ -4,66 +4,70 @@ import {
   OHLCVData,
   MarketContext,
   PriceLevel,
+  OHLCV,
 } from '@core/types';
 
-/**
- * Order Flow Analysis Strategy
- * Delta analysis, absorption zones, imbalance detection, exhaustion signals
- */
 export class OrderFlowStrategy implements IStrategyModule {
   name = 'mod_orderflow';
   weight = 0.68;
 
   analyze(data: OHLCVData, _context: MarketContext): StrategySignal {
     const bars = data.bars;
-    if (bars.length < 20) {
-      return this.neutralSignal();
-    }
+    if (bars.length < 20) return this.neutralSignal();
 
-    const delta = this.calculateDelta(bars);
-    const absorption = this.detectAbsorption(bars);
-    const lastBar = bars[bars.length - 1];
+    const last = bars[bars.length - 1];
+    const prev = bars[bars.length - 2];
 
-    // Positive delta accumulation = buying pressure
-    if (delta > 500 && lastBar.close > bars[bars.length - 2].close) {
+    // Relative delta: bullish/bearish volume imbalance over last 10 bars
+    const recent = bars.slice(-10);
+    const { deltaPct, buyVol, sellVol } = this.calculateRelativeDelta(recent);
+
+    // Absorption: high volume + small candle range (trapped traders)
+    const absorption = this.detectAbsorption(bars.slice(-8));
+
+    const strongBuy = deltaPct > 0.65 && last.close > prev.close; // >65% buy volume
+    const strongSell = deltaPct < 0.35 && last.close < prev.close; // <35% buy volume
+
+    if (strongBuy) {
+      const atr = this.atr(bars.slice(-14));
       return {
         direction: 'LONG',
-        confidence: 0.50,
-        entryZone: [lastBar.close, lastBar.close * 1.01],
-        target1: lastBar.close * 1.04,
-        target2: lastBar.close * 1.08,
-        invalidation: lastBar.low,
-        explanation: 'Positive order flow delta — accumulation in progress',
+        confidence: 0.50 + Math.min((deltaPct - 0.65) * 0.5, 0.12),
+        entryZone: [last.close, last.close * 1.005],
+        target1: last.close + atr * 2,
+        target2: last.close + atr * 3.5,
+        invalidation: last.low - atr * 0.5,
+        explanation: `Order flow: ${(deltaPct * 100).toFixed(0)}% buy volume (${this.formatVol(buyVol)} vs ${this.formatVol(sellVol)}) — bullish accumulation`,
         moduleName: this.name,
         weight: this.weight,
       };
     }
 
-    // Negative delta = selling pressure
-    if (delta < -500 && lastBar.close < bars[bars.length - 2].close) {
+    if (strongSell) {
+      const atr = this.atr(bars.slice(-14));
       return {
         direction: 'SHORT',
-        confidence: 0.48,
-        entryZone: [lastBar.close * 0.99, lastBar.close],
-        target1: lastBar.close * 0.96,
-        target2: lastBar.close * 0.92,
-        invalidation: lastBar.high,
-        explanation: 'Negative order flow delta — distribution in progress',
+        confidence: 0.48 + Math.min((0.35 - deltaPct) * 0.5, 0.10),
+        entryZone: [last.close * 0.995, last.close],
+        target1: last.close - atr * 2,
+        target2: last.close - atr * 3.5,
+        invalidation: last.high + atr * 0.5,
+        explanation: `Order flow: ${((1 - deltaPct) * 100).toFixed(0)}% sell volume (${this.formatVol(sellVol)} vs ${this.formatVol(buyVol)}) — bearish distribution`,
         moduleName: this.name,
         weight: this.weight,
       };
     }
 
-    // Absorption zone = reversal setup
-    if (absorption && absorption.type === 'bullish') {
+    if (absorption) {
+      const atr = this.atr(bars.slice(-14));
       return {
-        direction: 'LONG',
+        direction: absorption.direction === 'bullish' ? 'LONG' : 'SHORT',
         confidence: 0.46,
-        entryZone: [lastBar.close, lastBar.close * 1.01],
-        target1: lastBar.close * 1.05,
-        target2: lastBar.close * 1.1,
-        invalidation: absorption.low,
-        explanation: 'Seller absorption detected — bullish reversal potential',
+        entryZone: absorption.direction === 'bullish' ? [absorption.low, absorption.mid] : [absorption.mid, absorption.high],
+        target1: absorption.direction === 'bullish' ? last.close + atr * 2 : last.close - atr * 2,
+        target2: absorption.direction === 'bullish' ? last.close + atr * 3 : last.close - atr * 3,
+        invalidation: absorption.direction === 'bullish' ? absorption.low - atr : absorption.high + atr,
+        explanation: `${absorption.direction === 'bullish' ? 'Seller' : 'Buyer'} absorption — high vol (${this.formatVol(absorption.volume)}) with ${(absorption.rangeRatio * 100).toFixed(0)}% normal range = trapped ${absorption.direction === 'bullish' ? 'sellers' : 'buyers'}`,
         moduleName: this.name,
         weight: this.weight,
       };
@@ -72,72 +76,70 @@ export class OrderFlowStrategy implements IStrategyModule {
     return this.neutralSignal();
   }
 
-  getKeyLevels(): PriceLevel[] {
-    return [];
-  }
-
-  getConfidence(): number {
-    return 0.48;
-  }
-
-  getWeight(): number {
-    return this.weight;
-  }
-
-  getExplanation(): string {
-    return 'Order Flow — Delta analysis, absorption zones, stacked imbalances, exhaustion patterns';
-  }
-
-  private calculateDelta(bars: any[]): number {
-    // Simplified delta: up bars vs down bars weighted by volume
-    let delta = 0;
-
-    for (let i = 1; i < Math.min(bars.length, 21); i++) {
-      const bar = bars[i];
-      const prev = bars[i - 1];
-
-      if (bar.close > prev.close) {
-        delta += bar.volume * 0.5;
-      } else if (bar.close < prev.close) {
-        delta -= bar.volume * 0.5;
-      }
+  private calculateRelativeDelta(bars: OHLCV[]): { deltaPct: number; buyVol: number; sellVol: number } {
+    let buyVol = 0;
+    let sellVol = 0;
+    for (const bar of bars) {
+      const range = bar.high - bar.low || 0.0001;
+      const buyRatio = (bar.close - bar.low) / range; // close position in bar
+      buyVol += bar.volume * buyRatio;
+      sellVol += bar.volume * (1 - buyRatio);
     }
-
-    return delta;
+    const total = buyVol + sellVol || 1;
+    return { deltaPct: buyVol / total, buyVol, sellVol };
   }
 
-  private detectAbsorption(bars: any[]) {
-    // Simplified: detect large volume with small range = absorption
-    const recent = bars.slice(-5);
-    const ranges = recent.map((b) => b.high - b.low);
-    const volumes = recent.map((b) => b.volume);
+  private detectAbsorption(bars: OHLCV[]): {
+    direction: 'bullish' | 'bearish'; low: number; high: number; mid: number;
+    volume: number; rangeRatio: number;
+  } | null {
+    const avgRange = bars.reduce((s, b) => s + (b.high - b.low), 0) / bars.length;
+    const avgVol = bars.reduce((s, b) => s + b.volume, 0) / bars.length;
 
-    const avgRange = ranges.reduce((a, b) => a + b, 0) / ranges.length;
-    const avgVolume = volumes.reduce((a, b) => a + b, 0) / volumes.length;
-
-    for (let i = 0; i < recent.length; i++) {
-      if (ranges[i] < avgRange * 0.5 && volumes[i] > avgVolume * 1.5) {
+    for (const bar of bars.slice(-3)) {
+      const range = bar.high - bar.low;
+      const rangeRatio = range / (avgRange || range);
+      if (rangeRatio < 0.5 && bar.volume > avgVol * 1.5) {
+        const direction = bar.close > (bar.open ?? bar.close) ? 'bullish' : 'bearish';
         return {
-          type: 'bullish',
-          high: recent[i].high,
-          low: recent[i].low,
+          direction,
+          low: bar.low, high: bar.high,
+          mid: (bar.low + bar.high) / 2,
+          volume: bar.volume, rangeRatio,
         };
       }
     }
-
     return null;
   }
 
+  private atr(bars: OHLCV[]): number {
+    if (bars.length < 2) return 0;
+    let sum = 0;
+    for (let i = 1; i < bars.length; i++) {
+      const hl = bars[i].high - bars[i].low;
+      const hc = Math.abs(bars[i].high - bars[i - 1].close);
+      const lc = Math.abs(bars[i].low - bars[i - 1].close);
+      sum += Math.max(hl, hc, lc);
+    }
+    return sum / (bars.length - 1);
+  }
+
+  private formatVol(v: number): string {
+    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+    if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
+    return v.toFixed(0);
+  }
+
+  getKeyLevels(): PriceLevel[] { return []; }
+  getConfidence(): number { return 0.48; }
+  getWeight(): number { return this.weight; }
+  getExplanation(): string { return 'Order Flow — relative delta, absorption zones, volume imbalance'; }
+
   private neutralSignal(): StrategySignal {
     return {
-      direction: 'NEUTRAL',
-      confidence: 0,
-      entryZone: [0, 0],
-      target1: 0,
-      invalidation: 0,
-      explanation: 'No order flow signal',
-      moduleName: this.name,
-      weight: this.weight,
+      direction: 'NEUTRAL', confidence: 0, entryZone: [0, 0],
+      target1: 0, invalidation: 0, explanation: 'No order flow signal',
+      moduleName: this.name, weight: this.weight,
     };
   }
 }
