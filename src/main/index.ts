@@ -182,7 +182,8 @@ async function runLearningLoop() {
 
 ipcMain.handle('fetch-market-data', async (_e, symbol: string, timeframe: string) => {
   try {
-    const data = await marketDataService.fetchOHLCV(symbol, timeframe, 200);
+    // Use large limit to trigger max-range fetch for D/W/M timeframes
+    const data = await marketDataService.fetchOHLCV(symbol, timeframe, 5000);
     return { success: true, data };
   } catch (error) {
     return { success: false, error: (error as Error).message };

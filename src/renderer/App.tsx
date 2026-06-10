@@ -8,12 +8,14 @@ import { BottomBar } from '@/renderer/components/BottomBar';
 import { ScanResultsPanel } from '@/renderer/panels/ScanResultsPanel';
 
 type RightPanelTab = 'watchlist' | 'info' | 'analysis' | 'performance' | 'chat';
+type DrawingTool = 'cursor' | 'hline' | 'trendline' | 'fib' | 'text';
 
 const SCAN_SYMBOLS = ['AAPL', 'MSFT', 'TSLA', 'NVDA', 'GOOGL', 'AMZN', 'META', 'AMD', 'SPY', 'QQQ'];
 
 export default function App() {
   const [symbol, setSymbol] = useState('AAPL');
   const [timeframe, setTimeframe] = useState('1D');
+  const [activeTool, setActiveTool] = useState<DrawingTool>('cursor');
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('analysis');
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
@@ -84,9 +86,9 @@ export default function App() {
       />
 
       <div className="flex flex-1 overflow-hidden">
-        <LeftSidebar />
+        <LeftSidebar activeTool={activeTool} onToolChange={setActiveTool} />
 
-        <ChartPanel symbol={symbol} timeframe={timeframe} analysisResult={analysisResult} />
+        <ChartPanel symbol={symbol} timeframe={timeframe} analysisResult={analysisResult} activeTool={activeTool} onToolChange={setActiveTool} />
 
         {showScan ? (
           <ScanResultsPanel
@@ -109,7 +111,7 @@ export default function App() {
         )}
       </div>
 
-      <BottomBar />
+      <BottomBar symbol={symbol} />
     </Layout>
   );
 }

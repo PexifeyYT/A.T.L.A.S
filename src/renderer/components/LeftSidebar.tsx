@@ -1,41 +1,53 @@
-import React, { useState } from 'react';
+import React from 'react';
 
-type DrawingTool = 'crosshair' | 'trendline' | 'horizontal' | 'channel' | 'vertical' | 'freehand' | 'text' | 'callout' | 'zoom' | 'fib-retracement' | 'fib-extension' | 'lock' | 'edit' | 'unlock' | 'show' | 'delete';
+type DrawingTool = 'cursor' | 'hline' | 'trendline' | 'fib' | 'text';
 
-export const LeftSidebar: React.FC = () => {
-  const [activeTool, setActiveTool] = useState<DrawingTool | null>(null);
+interface LeftSidebarProps {
+  activeTool: DrawingTool;
+  onToolChange: (tool: DrawingTool) => void;
+}
 
+export const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeTool, onToolChange }) => {
   const tools: { id: DrawingTool; label: string; icon: string }[] = [
-    { id: 'crosshair', label: 'Crosshair', icon: '+' },
+    { id: 'cursor', label: 'Cursor (Esc)', icon: '↖' },
     { id: 'trendline', label: 'Trend Line', icon: '/' },
-    { id: 'horizontal', label: 'Horizontal Line', icon: '≡' },
-    { id: 'channel', label: 'Parallel Channel', icon: '⋈' },
-    { id: 'vertical', label: 'Vertical Line', icon: '⊥' },
-    { id: 'freehand', label: 'Freehand', icon: '~' },
-    { id: 'text', label: 'Text', icon: 'T' },
-    { id: 'callout', label: 'Callout', icon: '☺' },
-    { id: 'zoom', label: 'Magnifier', icon: '⊕' },
-    { id: 'fib-retracement', label: 'Fib Retracement', icon: '📐' },
-    { id: 'fib-extension', label: 'Fib Extension', icon: '🔗' },
-    { id: 'lock', label: 'Lock', icon: '🔒' },
-    { id: 'edit', label: 'Edit', icon: '✏️' },
-    { id: 'unlock', label: 'Unlock', icon: '🔓' },
-    { id: 'show', label: 'Show/Hide', icon: '👁️' },
-    { id: 'delete', label: 'Delete', icon: '🗑️' },
+    { id: 'hline', label: 'Horizontal Line', icon: '─' },
+    { id: 'fib', label: 'Fibonacci Retracement', icon: 'φ' },
+    { id: 'text', label: 'Text Label', icon: 'T' },
   ];
 
   return (
-    <div className="w-12 bg-tv-surface border-r border-tv-border flex flex-col items-center gap-2 py-2 overflow-y-auto">
-      {tools.map((tool) => (
+    <div className="w-12 bg-tv-surface border-r border-tv-border flex flex-col items-center gap-1 py-2">
+      {tools.map(tool => (
         <button
           key={tool.id}
-          onClick={() => setActiveTool(tool.id)}
+          onClick={() => onToolChange(tool.id)}
           title={tool.label}
-          className={`sidebar-icon flex items-center justify-center text-lg ${
-            activeTool === tool.id ? 'text-tv-accent' : 'text-tv-text-secondary'
+          className={`w-9 h-9 flex items-center justify-center rounded text-sm transition-colors ${
+            activeTool === tool.id
+              ? 'bg-tv-accent text-white'
+              : 'text-tv-text-secondary hover:bg-tv-surface2 hover:text-tv-text'
           }`}
         >
           {tool.icon}
+        </button>
+      ))}
+
+      <div className="w-7 h-px bg-tv-border my-1" />
+
+      {/* Non-functional extras for UI completeness */}
+      {[
+        { icon: '⋈', label: 'Parallel Channel' },
+        { icon: '⊥', label: 'Vertical Line' },
+        { icon: '~', label: 'Freehand' },
+        { icon: '☁', label: 'Callout' },
+      ].map(t => (
+        <button
+          key={t.label}
+          title={t.label}
+          className="w-9 h-9 flex items-center justify-center rounded text-sm text-tv-text-secondary hover:bg-tv-surface2 hover:text-tv-text transition-colors opacity-50 cursor-not-allowed"
+        >
+          {t.icon}
         </button>
       ))}
     </div>

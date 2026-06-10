@@ -12,6 +12,8 @@ interface ChartPanelProps {
   symbol: string;
   timeframe: string;
   analysisResult?: any;
+  activeTool?: DrawingTool;
+  onToolChange?: (tool: DrawingTool) => void;
 }
 
 type DrawingTool = 'cursor' | 'hline' | 'trendline' | 'fib' | 'text';
@@ -24,7 +26,7 @@ interface Drawing {
   label?: string;
 }
 
-export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analysisResult }) => {
+export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analysisResult, activeTool: externalTool, onToolChange }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -32,7 +34,9 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
   const cleanupRef = useRef<(() => void) | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTool, setActiveTool] = useState<DrawingTool>('cursor');
+  const [internalTool, setInternalTool] = useState<DrawingTool>('cursor');
+  const activeTool = externalTool ?? internalTool;
+  const setActiveTool = (t: DrawingTool) => { setInternalTool(t); onToolChange?.(t); };
   const [allBars, setAllBars] = useState<CandlestickData[]>([]);
   const [replayMode, setReplayMode] = useState(false);
   const [replayIndex, setReplayIndex] = useState(0);
