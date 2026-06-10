@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Layout } from '@/renderer/layouts/Layout';
 import { ChartPanel } from '@/renderer/panels/ChartPanel';
 import { TopToolbar } from '@/renderer/components/TopToolbar';
@@ -24,7 +24,7 @@ export default function App() {
   const [scanning, setScanning] = useState(false);
   const [showScan, setShowScan] = useState(false);
 
-  const handleRunAnalysis = async () => {
+  const handleRunAnalysis = useCallback(async () => {
     try {
       setAnalysisLoading(true);
       setAnalysisError(null);
@@ -49,7 +49,23 @@ export default function App() {
     } finally {
       setAnalysisLoading(false);
     }
-  };
+  }, [symbol, timeframe]);
+
+  // Keyboard shortcut: A = analyze, Escape = cursor tool
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.key === 'a' || e.key === 'A') {
+        if (!analysisLoading) handleRunAnalysis();
+      }
+      if (e.key === 'Escape') {
+        setActiveTool('cursor');
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [analysisLoading, handleRunAnalysis]);
 
   const handleScan = async () => {
     setScanning(true);

@@ -93,6 +93,7 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
           <button
             onClick={onAnalyze}
             disabled={analyzing}
+            title="Run analysis (A)"
             className={`px-4 py-1.5 text-xs rounded font-bold transition-colors ${
               analyzing
                 ? 'opacity-50 cursor-not-allowed bg-tv-surface2 text-tv-text-secondary'

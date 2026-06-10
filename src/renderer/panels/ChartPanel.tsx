@@ -43,15 +43,37 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
   const [replayPlaying, setReplayPlaying] = useState(false);
   const replayTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Drawing state
-  const [drawings, setDrawings] = useState<Drawing[]>([]);
-  const drawingsRef = useRef<Drawing[]>([]);
+  // Drawing state — persisted per symbol+timeframe in localStorage
+  const drawingKey = `atlas_drawings_${symbol}_${timeframe}`;
+  const [drawings, setDrawings] = useState<Drawing[]>(() => {
+    try {
+      const saved = localStorage.getItem(`atlas_drawings_${symbol}_${timeframe}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const drawingsRef = useRef<Drawing[]>(drawings);
   const activeDrawingRef = useRef<Drawing | null>(null);
   const isDrawingRef = useRef(false);
   const activeToolRef = useRef<DrawingTool>('cursor');
 
   useEffect(() => { activeToolRef.current = activeTool; }, [activeTool]);
-  useEffect(() => { drawingsRef.current = drawings; }, [drawings]);
+  useEffect(() => {
+    drawingsRef.current = drawings;
+    try { localStorage.setItem(drawingKey, JSON.stringify(drawings)); } catch {}
+  }, [drawings, drawingKey]);
+
+  // Reload drawings when symbol/timeframe changes
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(drawingKey);
+      const d = saved ? JSON.parse(saved) : [];
+      setDrawings(d);
+      drawingsRef.current = d;
+    } catch {
+      setDrawings([]);
+      drawingsRef.current = [];
+    }
+  }, [drawingKey]);
 
   // Build chart
   useEffect(() => {
