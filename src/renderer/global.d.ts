@@ -14,6 +14,7 @@ declare global {
       fetchLiveQuote: (symbol: string) => Promise<{ success: boolean; data: { price: number; change: number; changePercent: number } | null; error?: string }>;
       saveSettings: (settings: any) => Promise<{ success: boolean; error?: string }>;
       loadSettings: () => Promise<{ success: boolean; data: any; error?: string }>;
+      clearChatHistory: () => Promise<{ success: boolean }>;
     };
   }
 }

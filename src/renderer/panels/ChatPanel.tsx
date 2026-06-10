@@ -108,6 +108,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       content: `Chat cleared. Ask me anything about trading, markets, or ATLAS.`,
       timestamp: new Date(),
     }]);
+    window.api.clearChatHistory().catch(() => {});
   };
 
   return (

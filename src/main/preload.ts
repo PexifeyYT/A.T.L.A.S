@@ -15,4 +15,5 @@ contextBridge.exposeInMainWorld('api', {
   fetchLiveQuote: (symbol: string) => ipcRenderer.invoke('fetch-live-quote', symbol),
   saveSettings: (settings: any) => ipcRenderer.invoke('save-settings', settings),
   loadSettings: () => ipcRenderer.invoke('load-settings'),
+  clearChatHistory: () => ipcRenderer.invoke('clear-chat-history'),
 });

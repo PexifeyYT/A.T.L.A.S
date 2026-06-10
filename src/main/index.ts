@@ -340,3 +340,8 @@ ipcMain.handle('load-settings', async () => {
     return { success: false, error: (error as Error).message, data: {} };
   }
 });
+
+ipcMain.handle('clear-chat-history', async () => {
+  ollamaService.clearChatHistory();
+  return { success: true };
+});
