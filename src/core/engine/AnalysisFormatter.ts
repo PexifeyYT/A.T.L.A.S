@@ -25,13 +25,15 @@ export class AnalysisFormatter {
         '',
         `Only ${moduleCount}/${totalModules} modules in agreement.`,
         `Minimum 3 required for signal publication.`,
-        '',
-        result.keyLevels.length > 0 ? `📌 KEY LEVELS IDENTIFIED` : '',
-        ...result.keyLevels.slice(0, 5).map(l => `  ${l.label}: $${l.price.toFixed(2)}`),
+        ...(result.keyLevels.length > 0 ? [
+          '',
+          `📌 KEY LEVELS IDENTIFIED`,
+          ...result.keyLevels.slice(0, 5).map(l => `  ${l.label}: $${l.price.toFixed(2)}`),
+        ] : []),
         '',
         `🤖 ATLAS CONVICTION: ${conviction}/10`,
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-      ].filter(l => l !== undefined).join('\n');
+      ].join('\n');
     }
 
     const entryLow = sig.entryZone[0].toFixed(2);
@@ -66,7 +68,9 @@ export class AnalysisFormatter {
       `  Bias: ${directionLabel}`,
       `  Entry Zone: $${entryLow} – $${entryHigh}`,
       `  Target 1: $${t1} ${t1PctStr}`,
-      t2 ? `  Target 2: $${t2}` : '',
+    );
+    if (t2) lines.push(`  Target 2: $${t2}`);
+    lines.push(
       `  Invalidation: Daily close ${bullish ? 'below' : 'above'} $${inv}`,
       '',
     );
@@ -112,7 +116,7 @@ export class AnalysisFormatter {
     lines.push(`🤖 ATLAS CONVICTION: ${conviction}/10`);
     lines.push(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 
-    return lines.filter(l => l !== '').join('\n');
+    return lines.join('\n');
   }
 
   private generateStructureComment(result: AnalysisResult): string {
