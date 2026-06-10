@@ -14,7 +14,7 @@ export class LearningEngine {
     for (const moduleName of moduleNames) {
       this.moduleWeights.set(
         moduleName,
-        initialWeights.get(moduleName) || 1.0,
+        initialWeights.get(moduleName) ?? 1.0,
       );
     }
   }

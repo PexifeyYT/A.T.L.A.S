@@ -7,6 +7,13 @@ export class AnalysisEngine {
     this.strategies.set(strategy.name, strategy);
   }
 
+  updateWeights(weights: Map<string, number>): void {
+    for (const [name, weight] of weights) {
+      const strategy = this.strategies.get(name);
+      if (strategy) (strategy as any).weight = weight;
+    }
+  }
+
   async analyze(data: OHLCVData, context: MarketContext): Promise<AnalysisResult> {
     // Run all strategies in parallel
     const signalPromises = Array.from(this.strategies.values()).map((strategy) =>

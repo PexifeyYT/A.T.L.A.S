@@ -48,7 +48,7 @@ export class VolumeProfileStrategy implements IStrategyModule {
       return {
         direction: 'SHORT',
         confidence: 0.65 + (nearPOC ? 0.05 : 0),
-        entryZone: [profile.poc * 1.001, profile.poc * 0.999],
+        entryZone: [profile.poc * 0.999, profile.poc * 1.001],
         target1: profile.val,
         target2: profile.val - rangeSize * 0.5,
         invalidation: profile.vah + rangeSize * 0.05,
@@ -78,7 +78,7 @@ export class VolumeProfileStrategy implements IStrategyModule {
       return {
         direction: 'SHORT',
         confidence: 0.60,
-        entryZone: [profile.vah * 1.002, profile.vah * 0.998],
+        entryZone: [profile.vah * 0.998, profile.vah * 1.002],
         target1: profile.poc,
         target2: profile.val,
         invalidation: profile.vah * 1.03,

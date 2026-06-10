@@ -26,7 +26,7 @@ export class WyckoffStrategy implements IStrategyModule {
       const spring = this.detectSpring(recent, rangeLow);
       if (!spring) return this.neutralSignal();
 
-      const stopLoss = spring.springLow - last.close * 0.002;
+      const stopLoss = spring.springLow * 0.998;
       const risk = last.close - stopLoss;
       const t1 = last.close + risk * 2.0;
       const t2 = rangeHigh + (rangeHigh - rangeLow) * 0.5;
@@ -48,7 +48,7 @@ export class WyckoffStrategy implements IStrategyModule {
       const upthrust = this.detectUpthrust(recent, rangeHigh);
       if (!upthrust) return this.neutralSignal();
 
-      const stopLoss = upthrust.thrustHigh + last.close * 0.002;
+      const stopLoss = upthrust.thrustHigh * 1.002;
       const risk = stopLoss - last.close;
       const t1 = last.close - risk * 2.0;
       const t2 = rangeLow - (rangeHigh - rangeLow) * 0.5;
@@ -56,7 +56,7 @@ export class WyckoffStrategy implements IStrategyModule {
       return {
         direction: 'SHORT',
         confidence: 0.65 + (upthrust.volumeConfirm ? 0.07 : 0),
-        entryZone: [upthrust.thrustHigh, upthrust.thrustHigh * 0.995],
+        entryZone: [upthrust.thrustHigh * 0.995, upthrust.thrustHigh],
         target1: t1,
         target2: t2,
         invalidation: stopLoss,

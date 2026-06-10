@@ -21,7 +21,7 @@ export class ClassicalPatternsStrategy implements IStrategyModule {
         return {
           direction: 'SHORT',
           confidence: 0.68,
-          entryZone: [headShoulders.neckline * 1.001, headShoulders.neckline * 0.999],
+          entryZone: [headShoulders.neckline * 0.999, headShoulders.neckline * 1.001],
           target1: headShoulders.target,
           target2: headShoulders.target * 0.97,
           invalidation: headShoulders.headHigh * 1.002,
@@ -166,8 +166,8 @@ export class ClassicalPatternsStrategy implements IStrategyModule {
     const last = recent[recent.length - 1];
 
     // Descending highs + flat lows = ascending triangle (bullish)
-    const highRange = Math.max(...highs.slice(0, 12)) - Math.max(...highs.slice(13));
-    const lowRange = Math.abs(Math.min(...lows.slice(0, 12)) - Math.min(...lows.slice(13)));
+    const highRange = Math.max(...highs.slice(0, 12)) - Math.max(...highs.slice(12));
+    const lowRange = Math.abs(Math.min(...lows.slice(0, 12)) - Math.min(...lows.slice(12)));
 
     if (highRange > 0 && lowRange < highRange * 0.3) {
       // Converging from top = ascending triangle
@@ -186,8 +186,8 @@ export class ClassicalPatternsStrategy implements IStrategyModule {
     }
 
     // Flat highs + rising lows = descending triangle (bearish)
-    const highFlat = Math.abs(Math.max(...highs.slice(0, 12)) - Math.max(...highs.slice(13))) / Math.max(...highs);
-    const lowRising = Math.min(...lows.slice(13)) - Math.min(...lows.slice(0, 12));
+    const highFlat = Math.abs(Math.max(...highs.slice(0, 12)) - Math.max(...highs.slice(12))) / Math.max(...highs);
+    const lowRising = Math.min(...lows.slice(12)) - Math.min(...lows.slice(0, 12));
 
     if (highFlat < 0.02 && lowRising > 0) {
       const apex = Math.max(...highs);
@@ -243,7 +243,7 @@ export class ClassicalPatternsStrategy implements IStrategyModule {
     const l2 = Math.min(...lows.slice(10, 20));
     const l3 = Math.min(...lows.slice(20, 30));
 
-    if (l2 < l1 && l2 < l3 && Math.abs(l1 - l3) / Math.abs(l2) < 0.05) {
+    if (l2 < l1 && l2 < l3 && Math.abs(l1 - l3) / ((Math.abs(l1) + Math.abs(l3)) / 2) < 0.05) {
       const neckline = Math.max(...highs.slice(5, 25));
       if (recent[recent.length - 1].close > neckline) {
         return {

@@ -166,7 +166,6 @@ async function runLearningLoop() {
         const reward = outcome.directionCorrect ? 0.05 : -0.05;
         const newWeight = Math.max(0.1, Math.min(2.0, currentWeight + reward));
         setModuleWeight(moduleName, newWeight);
-        learningEngine.updateWeight(moduleName, outcome);
       }
 
       const stats = getStats(prediction.symbol);
@@ -177,6 +176,11 @@ async function runLearningLoop() {
         notes: '',
       });
     }
+    // Sync LearningEngine memory from DB so display and analysis stay consistent
+    const syncedWeights = new Map(
+      allModuleNames.map(name => [name, getModuleWeight(name) ?? defaultWeights.get(name) ?? 1.0])
+    );
+    learningEngine.initializeWeights(allModuleNames, syncedWeights);
   } catch (err) {
     console.error('[ATLAS] Learning loop error:', err);
   }
@@ -223,6 +227,8 @@ ipcMain.handle('run-analysis', async (_e, symbol: string, timeframe: string, ohl
       volatility,
     };
 
+    // Inject current learned weights into strategies before analysis
+    analysisEngine.updateWeights(learningEngine.getAllWeights());
     const result = await analysisEngine.analyze(ohlcvData, context);
     const llmText = await ollamaService.generateAnalysis(result);
     (result as any).llmText = llmText;

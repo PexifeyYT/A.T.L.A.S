@@ -32,14 +32,13 @@ export class TJRStrategy implements IStrategyModule {
     const entry = this.findBestEntry(bars.slice(-15), htfBias);
     if (!entry) return this.neutralSignal();
 
-    const last = bars[bars.length - 1];
     const allHighs = bars.slice(-50).map(b => b.high);
     const allLows = bars.slice(-50).map(b => b.low);
     const structureHigh = Math.max(...allHighs);
     const structureLow = Math.min(...allLows);
 
     if (htfBias === 'up') {
-      const stopLoss = Math.min(entry.low, structureLow) - last.close * 0.001;
+      const stopLoss = Math.min(entry.low, structureLow) * 0.999;
       const risk = entry.mid - stopLoss;
       if (risk <= 0) return this.neutralSignal();
 
@@ -63,7 +62,7 @@ export class TJRStrategy implements IStrategyModule {
     }
 
     if (htfBias === 'down') {
-      const stopLoss = Math.max(entry.high, structureHigh) + last.close * 0.001;
+      const stopLoss = Math.max(entry.high, structureHigh) * 1.001;
       const risk = stopLoss - entry.mid;
       if (risk <= 0) return this.neutralSignal();
 
@@ -76,7 +75,7 @@ export class TJRStrategy implements IStrategyModule {
       return {
         direction: 'SHORT',
         confidence: Math.min(0.65 + Math.min(rr / 20, 0.15), 0.82),
-        entryZone: [entry.high, entry.low],
+        entryZone: [entry.low, entry.high],
         target1: t1,
         target2: t2,
         invalidation: stopLoss,

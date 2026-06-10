@@ -47,7 +47,7 @@ export class SMCStrategy implements IStrategyModule {
         entryZone: entry,
         target1: t1,
         target2: t2,
-        invalidation: structureLow - last.close * 0.002,
+        invalidation: structureLow * 0.998,
         explanation: `SMC BOS bullish${ob ? ' + OB retest' : ''}${fvg ? ' + FVG' : ''} — entry ${entry[0].toFixed(2)}–${entry[1].toFixed(2)}, INV ${structureLow.toFixed(2)}`,
         moduleName: this.name,
         weight: this.weight,
@@ -55,7 +55,7 @@ export class SMCStrategy implements IStrategyModule {
     }
 
     if (bos.direction === 'down') {
-      const entry = ob ? [ob.high, ob.low] as [number, number] : [last.close * 0.995, last.close * 1.005] as [number, number];
+      const entry = ob ? [ob.low, ob.high] as [number, number] : [last.close * 0.995, last.close * 1.005] as [number, number];
       const risk = structureHigh - entry[1];
       if (risk <= 0) return this.neutralSignal();
 
@@ -69,7 +69,7 @@ export class SMCStrategy implements IStrategyModule {
         entryZone: entry,
         target1: t1,
         target2: t2,
-        invalidation: structureHigh + last.close * 0.002,
+        invalidation: structureHigh * 1.002,
         explanation: `SMC CHoCH bearish${ob ? ' + OB retest' : ''}${fvg ? ' + FVG' : ''} — entry ${entry[1].toFixed(2)}, INV ${structureHigh.toFixed(2)}`,
         moduleName: this.name,
         weight: this.weight,
