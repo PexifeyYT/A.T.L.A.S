@@ -1,4 +1,4 @@
-import { PredictionOutcome, Prediction } from '@core/types';
+import { PredictionOutcome } from '@core/types';
 
 /**
  * Learning Engine - Updates module weights based on prediction outcomes

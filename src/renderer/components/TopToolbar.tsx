@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SymbolSearch } from './SymbolSearch';
 
 interface TopToolbarProps {
@@ -8,6 +8,8 @@ interface TopToolbarProps {
   onTimeframeChange: (tf: string) => void;
   onAnalyze?: () => void;
   analyzing?: boolean;
+  onScan?: () => void;
+  scanning?: boolean;
 }
 
 const TIMEFRAMES = ['1m', '5m', '15m', '30m', '1H', '2H', '4H', '1D', '1W', '1M'];
@@ -19,68 +21,93 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
   onTimeframeChange,
   onAnalyze,
   analyzing = false,
+  onScan,
+  scanning = false,
 }) => {
   const [showSearch, setShowSearch] = useState(false);
 
+  // Global hotkey: / or Ctrl+K opens search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.key === '/' || (e.ctrlKey && e.key === 'k')) && !showSearch) {
+        e.preventDefault();
+        setShowSearch(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [showSearch]);
+
   return (
-    <div className="flex items-center gap-4 h-12 px-4 bg-tv-surface border-b border-tv-border">
-      {/* Logo */}
-      <div className="text-lg font-bold text-tv-accent">ATLAS</div>
+    <>
+      <div className="flex items-center gap-2 h-12 px-4 bg-tv-surface border-b border-tv-border">
+        {/* Logo */}
+        <div className="text-base font-bold text-tv-accent tracking-widest mr-2">ATLAS</div>
 
-      {/* Symbol Search */}
-      <div className="flex-1 max-w-xs relative">
-        <SymbolSearch
-          value={symbol}
-          onChange={(sym) => {
-            onSymbolChange(sym);
-            setShowSearch(false);
-          }}
-          onFocus={() => setShowSearch(true)}
-          onBlur={() => setTimeout(() => setShowSearch(false), 200)}
-        />
-      </div>
-
-      {/* Timeframe buttons */}
-      <div className="flex items-center gap-2 border-l border-tv-border pl-4">
-        {TIMEFRAMES.map((tf) => (
-          <button
-            key={tf}
-            onClick={() => onTimeframeChange(tf)}
-            className={`toolbar-button ${tf === timeframe ? 'active' : ''}`}
-          >
-            {tf}
-          </button>
-        ))}
-      </div>
-
-      {/* Action buttons */}
-      <div className="flex items-center gap-2 border-l border-tv-border pl-4 ml-auto">
-        <button className="toolbar-button" title="Indicators">
-          📊 Indicators
-        </button>
-        <button className="toolbar-button" title="Alerts">
-          🔔 Alerts
-        </button>
-        <button className="toolbar-button" title="Replay">
-          ⏮ Replay
-        </button>
-        <button className="toolbar-button" title="Undo">
-          ↶
-        </button>
-        <button className="toolbar-button" title="Redo">
-          ↷
-        </button>
+        {/* Symbol button — opens overlay */}
         <button
-          onClick={onAnalyze}
-          disabled={analyzing}
-          className={`toolbar-button font-bold ${analyzing ? 'opacity-50 cursor-not-allowed' : 'bg-tv-accent text-tv-bg hover:bg-blue-600'}`}
+          onClick={() => setShowSearch(true)}
+          className="flex items-center gap-2 px-3 py-1.5 bg-tv-surface2 border border-tv-border rounded hover:border-tv-accent transition-colors text-sm font-bold text-tv-text min-w-[100px]"
+          title="Search symbol (/ or Ctrl+K)"
         >
-          🤖 {analyzing ? 'ANALYZING...' : 'ANALYZE'}
+          <span>{symbol}</span>
+          <span className="text-tv-text-secondary text-xs">▼</span>
         </button>
-        <button className="toolbar-button">
-          📋 SCAN
-        </button>
+
+        {/* Timeframe buttons */}
+        <div className="flex items-center gap-0.5 border-l border-tv-border pl-3">
+          {TIMEFRAMES.map(tf => (
+            <button
+              key={tf}
+              onClick={() => onTimeframeChange(tf)}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                tf === timeframe
+                  ? 'bg-tv-accent/20 text-tv-accent font-semibold'
+                  : 'text-tv-text-secondary hover:bg-tv-surface2 hover:text-tv-text'
+              }`}
+            >
+              {tf}
+            </button>
+          ))}
+        </div>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onScan}
+            disabled={scanning}
+            className={`px-3 py-1.5 text-xs rounded border transition-colors ${
+              scanning
+                ? 'opacity-50 cursor-not-allowed border-tv-border text-tv-text-secondary'
+                : 'border-tv-orange/50 text-tv-orange hover:bg-tv-orange/10'
+            }`}
+          >
+            {scanning ? '⏳ SCANNING...' : '📋 SCAN ALL'}
+          </button>
+
+          <button
+            onClick={onAnalyze}
+            disabled={analyzing}
+            className={`px-4 py-1.5 text-xs rounded font-bold transition-colors ${
+              analyzing
+                ? 'opacity-50 cursor-not-allowed bg-tv-surface2 text-tv-text-secondary'
+                : 'bg-tv-accent text-white hover:bg-blue-500'
+            }`}
+          >
+            {analyzing ? '⏳ ANALYZING...' : '🤖 ANALYZE'}
+          </button>
+        </div>
       </div>
-    </div>
+
+      {showSearch && (
+        <SymbolSearch
+          onSelect={onSymbolChange}
+          onClose={() => setShowSearch(false)}
+        />
+      )}
+    </>
   );
 };

@@ -62,6 +62,7 @@ export interface AnalysisResult {
   modulesAgreed: string[];
   keyLevels: PriceLevel[];
   riskFlags: string[];
+  predictionId?: string;
   prediction: {
     scenario1: { direction: string; probability: number; target1: number; target2: number };
     scenario2?: { direction: string; probability: number; target1: number; target2: number };

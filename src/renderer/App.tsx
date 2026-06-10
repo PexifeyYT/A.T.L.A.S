@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Layout } from '@/renderer/layouts/Layout';
 import { ChartPanel } from '@/renderer/panels/ChartPanel';
 import { TopToolbar } from '@/renderer/components/TopToolbar';
 import { LeftSidebar } from '@/renderer/components/LeftSidebar';
 import { RightPanel } from '@/renderer/panels/RightPanel';
 import { BottomBar } from '@/renderer/components/BottomBar';
+import { ScanResultsPanel } from '@/renderer/panels/ScanResultsPanel';
+
+const SCAN_SYMBOLS = ['AAPL', 'MSFT', 'TSLA', 'NVDA', 'GOOGL', 'AMZN', 'META', 'AMD', 'SPY', 'QQQ'];
 
 export default function App() {
   const [symbol, setSymbol] = useState('AAPL');
@@ -13,6 +16,9 @@ export default function App() {
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [scanResults, setScanResults] = useState<any[]>([]);
+  const [scanning, setScanning] = useState(false);
+  const [showScan, setShowScan] = useState(false);
 
   const handleRunAnalysis = async () => {
     try {
@@ -20,17 +26,15 @@ export default function App() {
       setAnalysisError(null);
       setRightPanelTab('analysis');
 
-      // Fetch market data
       const marketDataResult = await window.api.fetchMarketData(symbol, timeframe);
       if (!marketDataResult.success) {
-        setAnalysisError(marketDataResult.error);
+        setAnalysisError(marketDataResult.error ?? 'Failed to fetch data');
         return;
       }
 
-      // Run analysis
       const analysisRes = await window.api.runAnalysis(symbol, timeframe, marketDataResult.data);
       if (!analysisRes.success) {
-        setAnalysisError(analysisRes.error);
+        setAnalysisError(analysisRes.error ?? 'Analysis failed');
         return;
       }
 
@@ -43,29 +47,64 @@ export default function App() {
     }
   };
 
+  const handleScan = async () => {
+    setScanning(true);
+    setShowScan(true);
+    setScanResults([]);
+
+    const results: any[] = [];
+    for (const sym of SCAN_SYMBOLS) {
+      try {
+        const md = await window.api.fetchMarketData(sym, timeframe);
+        if (!md.success) continue;
+        const ar = await window.api.runAnalysis(sym, timeframe, md.data);
+        if (!ar.success) continue;
+        results.push({ symbol: sym, ...ar.data });
+        setScanResults([...results]);
+      } catch {
+        // skip failed symbols
+      }
+    }
+
+    setScanning(false);
+  };
+
   return (
     <Layout>
       <TopToolbar
         symbol={symbol}
-        onSymbolChange={setSymbol}
+        onSymbolChange={sym => { setSymbol(sym); setAnalysisResult(null); }}
         timeframe={timeframe}
         onTimeframeChange={setTimeframe}
         onAnalyze={handleRunAnalysis}
         analyzing={analysisLoading}
+        onScan={handleScan}
+        scanning={scanning}
       />
 
       <div className="flex flex-1 overflow-hidden">
         <LeftSidebar />
 
-        <ChartPanel symbol={symbol} timeframe={timeframe} />
+        <ChartPanel symbol={symbol} timeframe={timeframe} analysisResult={analysisResult} />
 
-        <RightPanel
-          activeTab={rightPanelTab}
-          onTabChange={setRightPanelTab}
-          analysisResult={analysisResult}
-          analysisLoading={analysisLoading}
-          analysisError={analysisError}
-        />
+        {showScan ? (
+          <ScanResultsPanel
+            results={scanResults}
+            scanning={scanning}
+            timeframe={timeframe}
+            onSelectSymbol={sym => { setSymbol(sym); setShowScan(false); }}
+            onClose={() => setShowScan(false)}
+          />
+        ) : (
+          <RightPanel
+            activeTab={rightPanelTab}
+            onTabChange={setRightPanelTab}
+            analysisResult={analysisResult}
+            analysisLoading={analysisLoading}
+            analysisError={analysisError}
+            symbol={symbol}
+          />
+        )}
       </div>
 
       <BottomBar />
