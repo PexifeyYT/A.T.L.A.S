@@ -67,7 +67,7 @@ export class PatternDiscovery {
 
     // Check pairs of modules
     for (const pred of winners) {
-      const modules = pred.modulesAgreed.sort();
+      const modules = [...pred.modulesAgreed].sort();
 
       // Single modules
       for (const mod of modules) {

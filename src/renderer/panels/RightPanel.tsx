@@ -26,9 +26,12 @@ export const RightPanel: React.FC<RightPanelProps> = ({
   const [perfStats, setPerfStats] = useState<any>(null);
 
   useEffect(() => {
-    window.api.getPerformanceStats().then(r => {
+    const load = () => window.api.getPerformanceStats().then(r => {
       if (r.success) setPerfStats(r.data);
     }).catch(() => {});
+    load();
+    const interval = setInterval(load, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   const tabs: { id: RightPanelTab; label: string; icon: string }[] = [

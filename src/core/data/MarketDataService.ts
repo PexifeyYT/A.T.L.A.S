@@ -38,7 +38,9 @@ export class MarketDataService {
   private readonly TTL = 5 * 60 * 1000; // 5 min
 
   async fetchOHLCV(symbol: string, timeframe: string, limit = 200): Promise<OHLCVData> {
-    const key = `${symbol}_${timeframe}_${limit}`;
+    // Normalize key: requests > 500 all fetch full history, share same cache entry
+    const cacheLimit = limit > 500 ? 'max' : limit;
+    const key = `${symbol}_${timeframe}_${cacheLimit}`;
     const cached = this.cache.get(key);
     if (cached && Date.now() < cached.expiry) return cached.data;
 
