@@ -77,11 +77,27 @@ export const BottomBar: React.FC<BottomBarProps> = ({ symbol }) => {
   );
 };
 
+function isEDT(d: Date): boolean {
+  const y = d.getUTCFullYear();
+  // 2nd Sunday of March at 07:00 UTC (2 AM EST → EDT)
+  let marchSun = 0, count = 0;
+  for (let day = 1; day <= 31; day++) {
+    if (new Date(Date.UTC(y, 2, day)).getUTCDay() === 0 && ++count === 2) { marchSun = day; break; }
+  }
+  // 1st Sunday of November at 06:00 UTC (2 AM EDT → EST)
+  let novSun = 0;
+  for (let day = 1; day <= 30; day++) {
+    if (new Date(Date.UTC(y, 10, day)).getUTCDay() === 0) { novSun = day; break; }
+  }
+  const start = new Date(Date.UTC(y, 2, marchSun, 7));
+  const end   = new Date(Date.UTC(y, 10, novSun, 6));
+  return d >= start && d < end;
+}
+
 function isMarketOpen(d: Date): boolean {
   const day = d.getUTCDay();
   if (day === 0 || day === 6) return false;
-  const h = d.getUTCHours();
-  const m = d.getUTCMinutes();
-  const mins = h * 60 + m;
-  return mins >= 870 && mins < 1260;
+  const mins = d.getUTCHours() * 60 + d.getUTCMinutes();
+  // EDT (UTC-4): 13:30-20:00 UTC; EST (UTC-5): 14:30-21:00 UTC
+  return isEDT(d) ? mins >= 810 && mins < 1200 : mins >= 870 && mins < 1260;
 }

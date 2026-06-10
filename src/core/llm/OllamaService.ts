@@ -156,6 +156,7 @@ export class OllamaService {
       const reply: string = resp.data.content?.[0]?.text ?? 'No response';
       this.chatHistory.push({ role: 'user', content: message });
       this.chatHistory.push({ role: 'assistant', content: reply });
+      if (this.chatHistory.length > 40) this.chatHistory = this.chatHistory.slice(-40);
       return reply;
     } catch (err: any) {
       console.warn('Claude API chat failed:', err?.response?.data || err.message);
@@ -200,6 +201,7 @@ export class OllamaService {
 
       this.chatHistory.push({ role: 'user', content: message });
       this.chatHistory.push({ role: 'assistant', content: reply });
+      if (this.chatHistory.length > 40) this.chatHistory = this.chatHistory.slice(-40);
 
       return reply;
     } catch (err) {

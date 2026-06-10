@@ -162,7 +162,7 @@ async function runLearningLoop() {
       saveOutcome(outcome);
 
       for (const moduleName of prediction.modulesAgreed) {
-        const currentWeight = getModuleWeight(moduleName);
+        const currentWeight = getModuleWeight(moduleName) ?? defaultWeights.get(moduleName) ?? 1.0;
         const reward = outcome.directionCorrect ? 0.05 : -0.05;
         const newWeight = Math.max(0.1, Math.min(2.0, currentWeight + reward));
         setModuleWeight(moduleName, newWeight);

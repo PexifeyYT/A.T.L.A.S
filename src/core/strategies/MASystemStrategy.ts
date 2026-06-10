@@ -20,16 +20,15 @@ export class MASystemStrategy implements IStrategyModule {
       return this.neutralSignal();
     }
 
+    const prevBars = bars.slice(0, -1);
     const ma9 = this.calculateEMA(bars, 9);
     const ma21 = this.calculateEMA(bars, 21);
     const ma50 = this.calculateEMA(bars, 50);
     const ma200 = this.calculateEMA(bars, 200);
+    const prev9 = this.calculateEMA(prevBars, 9);
+    const prev21 = this.calculateEMA(prevBars, 21);
 
     const lastClose = bars[bars.length - 1].close;
-
-    // Golden cross: 9 EMA crosses above 21 EMA
-    const prev9 = this.calculateEMA(bars.slice(0, -1), 9);
-    const prev21 = this.calculateEMA(bars.slice(0, -1), 21);
 
     const goldenCross = prev9 <= prev21 && ma9 > ma21;
     const deathCross = prev9 >= prev21 && ma9 < ma21;
