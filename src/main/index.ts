@@ -1,7 +1,5 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
-
-const isDev = !app.isPackaged;
 import { AnalysisEngine } from '../core/engine/AnalysisEngine';
 import { MarketDataService } from '../core/data/MarketDataService';
 import { SMCStrategy } from '../core/strategies/SMCStrategy';
@@ -36,7 +34,6 @@ import { randomUUID } from 'crypto';
 
 let mainWindow: BrowserWindow | null = null;
 
-// Initialize analysis engine with strategies
 const analysisEngine = new AnalysisEngine();
 const marketDataService = new MarketDataService();
 const learningEngine = new LearningEngine();
@@ -57,7 +54,6 @@ const defaultWeights = new Map([
   ['mod_orderflow', 0.68],
 ]);
 
-// Register strategies (13 total)
 analysisEngine.registerStrategy(new SMCStrategy());
 analysisEngine.registerStrategy(new TJRStrategy());
 analysisEngine.registerStrategy(new WyckoffStrategy());
@@ -73,30 +69,51 @@ analysisEngine.registerStrategy(new SeasonalityStrategy());
 analysisEngine.registerStrategy(new OrderFlowStrategy());
 
 const createWindow = () => {
+  // isDev must be evaluated AFTER app is ready
+  const isDev = !app.isPackaged;
+
   mainWindow = new BrowserWindow({
-    width: 1920,
-    height: 1080,
+    width: 1440,
+    height: 900,
     minWidth: 1280,
     minHeight: 720,
     backgroundColor: '#131722',
+    show: false, // don't show until ready-to-show to avoid blank flash
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      webSecurity: false, // allow file:// cross-origin for local assets
     },
     titleBarStyle: 'default',
     title: 'ATLAS — AI Trading Analysis System',
   });
 
-  const startUrl = isDev
-    ? 'http://localhost:5173'
-    : `file://${path.join(__dirname, '../../renderer/index.html')}`;
-
-  mainWindow.loadURL(startUrl);
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.show();
+  });
 
   if (isDev) {
+    mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
+  } else {
+    // Use loadFile for packaged app — handles file:// and relative assets correctly
+    const rendererPath = path.join(__dirname, '..', '..', 'renderer', 'index.html');
+    console.log('[ATLAS] Loading renderer from:', rendererPath);
+    mainWindow.loadFile(rendererPath).catch(err => {
+      console.error('[ATLAS] Failed to load renderer:', err);
+      dialog.showErrorBox('Load Error', `Failed to load UI:\n${rendererPath}\n\n${err.message}`);
+    });
   }
+
+  // Log any renderer errors for debugging
+  mainWindow.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    console.error('[ATLAS] Page failed to load:', code, desc, url);
+  });
+
+  mainWindow.webContents.on('crashed' as any, () => {
+    console.error('[ATLAS] Renderer crashed');
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -104,46 +121,42 @@ const createWindow = () => {
 };
 
 app.on('ready', () => {
-  // Initialize DB
   try {
     initDatabase();
     learningEngine.initializeWeights(allModuleNames, defaultWeights);
-    console.log('ATLAS database initialized');
+    console.log('[ATLAS] Database initialized');
   } catch (err) {
-    console.error('DB init failed:', err);
+    console.error('[ATLAS] DB init failed:', err);
   }
 
-  // Try to connect to local Ollama LLM
   ollamaService.init().catch(() => {});
-
   createWindow();
-
-  // Schedule learning loop — check pending predictions every 30 min
   setInterval(runLearningLoop, 30 * 60 * 1000);
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('activate', () => {
-  if (mainWindow === null) {
-    createWindow();
-  }
+  if (mainWindow === null) createWindow();
+});
+
+// Catch unhandled exceptions — show dialog instead of silent crash
+process.on('uncaughtException', (err) => {
+  console.error('[ATLAS] Uncaught exception:', err);
+  dialog.showErrorBox('ATLAS Error', err.message + '\n\n' + err.stack);
 });
 
 async function runLearningLoop() {
   try {
     const pending = getPendingPredictions();
-    console.log(`Learning loop: checking ${pending.length} pending predictions`);
+    console.log(`[ATLAS] Learning loop: ${pending.length} pending predictions`);
 
     for (const prediction of pending) {
       const outcome = await outcomeChecker.checkPrediction(prediction);
       saveOutcome(outcome);
 
-      // Update module weights
       for (const moduleName of prediction.modulesAgreed) {
         const currentWeight = getModuleWeight(moduleName);
         const reward = outcome.directionCorrect ? 0.05 : -0.05;
@@ -152,7 +165,6 @@ async function runLearningLoop() {
         learningEngine.updateWeight(moduleName, outcome);
       }
 
-      // Update asset profile
       const stats = getStats();
       upsertAssetProfile(prediction.symbol, {
         accuracy: stats.accuracy,
@@ -162,122 +174,101 @@ async function runLearningLoop() {
       });
     }
   } catch (err) {
-    console.error('Learning loop error:', err);
+    console.error('[ATLAS] Learning loop error:', err);
   }
 }
 
-// ─── IPC Handlers ───────────────────────────────────────────────────────────
+// ─── IPC Handlers ─────────────────────────────────────────────────────────────
 
-ipcMain.handle('fetch-market-data', async (_event, symbol: string, timeframe: string) => {
+ipcMain.handle('fetch-market-data', async (_e, symbol: string, timeframe: string) => {
   try {
     const data = await marketDataService.fetchOHLCV(symbol, timeframe, 200);
     return { success: true, data };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: errorMessage };
+    return { success: false, error: (error as Error).message };
   }
 });
 
-ipcMain.handle(
-  'run-analysis',
-  async (_event, symbol: string, timeframe: string, ohlcvData: OHLCVData) => {
-    try {
-      const context: MarketContext = {
+ipcMain.handle('run-analysis', async (_e, symbol: string, timeframe: string, ohlcvData: OHLCVData) => {
+  try {
+    const context: MarketContext = {
+      symbol,
+      timestamp: Date.now(),
+      macroTrend: 'UPTREND',
+      volatility: 0.5,
+    };
+
+    const result = await analysisEngine.analyze(ohlcvData, context);
+    const llmText = await ollamaService.generateAnalysis(result);
+    (result as any).llmText = llmText;
+    (result as any).llmModel = ollamaService.getModel() ?? 'rule-based';
+
+    if (result.confidence >= 6.0 && result.primarySignal.direction !== 'NEUTRAL') {
+      const prediction: Prediction = {
+        id: randomUUID(),
         symbol,
+        timeframe,
         timestamp: Date.now(),
-        macroTrend: 'UPTREND',
-        volatility: 0.5,
+        direction: result.primarySignal.direction as 'LONG' | 'SHORT',
+        entryZone: result.primarySignal.entryZone as [number, number],
+        target1: result.primarySignal.target1,
+        target2: result.primarySignal.target2 || result.primarySignal.target1 * 1.05,
+        invalidation: result.primarySignal.invalidation,
+        horizonBars: 12,
+        modulesAgreed: result.modulesAgreed,
+        conviction: result.confidence,
+        status: 'PENDING',
       };
-
-      const result = await analysisEngine.analyze(ohlcvData, context);
-
-      // Generate LLM narrative (Ollama if available, else rule-based)
-      const llmText = await ollamaService.generateAnalysis(result);
-      (result as any).llmText = llmText;
-      (result as any).llmModel = ollamaService.getModel() ?? 'rule-based';
-
-      // Auto-save prediction if signal is strong enough
-      if (result.confidence >= 6.0 && result.primarySignal.direction !== 'NEUTRAL') {
-        const prediction: Prediction = {
-          id: randomUUID(),
-          symbol,
-          timeframe,
-          timestamp: Date.now(),
-          direction: result.primarySignal.direction as 'LONG' | 'SHORT',
-          entryZone: result.primarySignal.entryZone as [number, number],
-          target1: result.primarySignal.target1,
-          target2: result.primarySignal.target2 || result.primarySignal.target1 * 1.05,
-          invalidation: result.primarySignal.invalidation,
-          horizonBars: 12,
-          modulesAgreed: result.modulesAgreed,
-          conviction: result.confidence,
-          status: 'PENDING',
-        };
-        savePrediction(prediction);
-        result.predictionId = prediction.id;
-      }
-
-      return { success: true, data: result };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return { success: false, error: errorMessage };
+      savePrediction(prediction);
+      result.predictionId = prediction.id;
     }
-  },
-);
+
+    return { success: true, data: result };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
 
 ipcMain.handle('get-performance-stats', async () => {
   try {
     const stats = getStats();
     const weights = learningEngine.getAllWeights();
-    return {
-      success: true,
-      data: {
-        ...stats,
-        moduleWeights: Object.fromEntries(weights),
-      },
-    };
+    return { success: true, data: { ...stats, moduleWeights: Object.fromEntries(weights) } };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: errorMessage };
+    return { success: false, error: (error as Error).message };
   }
 });
 
-ipcMain.handle('get-asset-profile', async (_event, symbol: string) => {
+ipcMain.handle('get-asset-profile', async (_e, symbol: string) => {
   try {
     const profile = getAssetProfile(symbol);
     return { success: true, data: profile };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: errorMessage };
+    return { success: false, error: (error as Error).message };
   }
 });
 
-ipcMain.handle('get-symbol-data', async (_event, symbol: string) => {
+ipcMain.handle('get-symbol-data', async (_e, symbol: string) => {
   try {
     const data = await marketDataService.fetchOHLCV(symbol, '1D', 200);
     return { success: true, data };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: errorMessage };
+    return { success: false, error: (error as Error).message };
   }
 });
 
 ipcMain.handle('get-llm-status', async () => {
   return {
     success: true,
-    data: {
-      available: ollamaService.isAvailable(),
-      model: ollamaService.getModel(),
-    },
+    data: { available: ollamaService.isAvailable(), model: ollamaService.getModel() },
   };
 });
 
-ipcMain.handle('chat-message', async (_event, message: string, context: any) => {
+ipcMain.handle('chat-message', async (_e, message: string, context: any) => {
   try {
     const reply = await ollamaService.chat(message, context);
     return { success: true, data: reply };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: errorMessage };
+    return { success: false, error: (error as Error).message };
   }
 });
