@@ -222,7 +222,7 @@ export class OllamaService {
     }
 
     if (q.includes('module weight') || q.includes('learning')) {
-      return `ATLAS updates module weights after each prediction outcome:\n\n• Direction correct: +0.05 weight\n• Direction wrong: -0.05 weight\n• T1 hit: +0.2 to score\n• T2 hit: +0.3 to score\n• Invalidation hit: -0.2 to score\n• Entry respected: +0.1 to score\n\nWeights clamped between 0.1 (min) and 2.0 (max). Learning rate: 0.05. Over time, more accurate modules gain higher weights and dominate the signal.`;
+      return `ATLAS updates module weights after each prediction outcome using a normalized score:\n\n• Direction correct: +2\n• Target 1 hit: +3\n• Target 2 hit: +5\n• No invalidation: +1\n• Invalidation hit: -3\n• Entry respected: +1\n\nScore (-3 to +11) normalized to weight delta (~±0.1). Weights clamped 0.1–2.0. Over time, more accurate modules gain higher weights and dominate the signal.`;
     }
 
     if (q.includes('performance') || q.includes('accuracy')) {
