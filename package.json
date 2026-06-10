@@ -12,8 +12,33 @@
     "build": "npm run build:react && npm run build:electron",
     "build:react": "vite build",
     "build:electron": "tsc --project tsconfig.electron.json",
-    "dist": "npm run build && electron-builder",
+    "dist": "npm run build && electron-builder --win",
     "start": "electron dist/main/index.js"
+  },
+  "build": {
+    "appId": "com.atlas.trading",
+    "productName": "ATLAS",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "assets/icon.ico",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ATLAS"
+    }
   },
   "dependencies": {
     "axios": "^1.6.0",
