@@ -272,3 +272,50 @@ ipcMain.handle('chat-message', async (_e, message: string, context: any) => {
     return { success: false, error: (error as Error).message };
   }
 });
+
+ipcMain.handle('search-symbols', async (_e, query: string) => {
+  try {
+    const results = await marketDataService.searchSymbols(query);
+    return { success: true, data: results };
+  } catch (error) {
+    return { success: false, error: (error as Error).message, data: [] };
+  }
+});
+
+ipcMain.handle('fetch-live-quote', async (_e, symbol: string) => {
+  try {
+    const quote = await marketDataService.fetchQuote(symbol);
+    return { success: true, data: quote };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('save-settings', async (_e, settings: any) => {
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const settingsPath = path.join(app.getPath('userData'), 'atlas-settings.json');
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+    if (settings.anthropicApiKey) {
+      process.env.ANTHROPIC_API_KEY = settings.anthropicApiKey;
+      ollamaService.setAnthropicKey(settings.anthropicApiKey);
+    }
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+});
+
+ipcMain.handle('load-settings', async () => {
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const settingsPath = path.join(app.getPath('userData'), 'atlas-settings.json');
+    if (!fs.existsSync(settingsPath)) return { success: true, data: {} };
+    const raw = fs.readFileSync(settingsPath, 'utf-8');
+    return { success: true, data: JSON.parse(raw) };
+  } catch (error) {
+    return { success: false, error: (error as Error).message, data: {} };
+  }
+});

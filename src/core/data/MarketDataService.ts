@@ -56,14 +56,21 @@ export class MarketDataService {
 
   private async fetchFromYahoo(symbol: string, timeframe: string, limit: number): Promise<OHLCVData> {
     const config = TIMEFRAME_MAP[timeframe] || TIMEFRAME_MAP['1D'];
-    const rangeDays = Math.min(config.rangeMultiplier * Math.ceil(limit / 100), 730);
-    const range = rangeDays < 8 ? `${rangeDays}d` : rangeDays < 60 ? `${Math.ceil(rangeDays / 30)}mo` : '2y';
+
+    // Use max range for daily/weekly/monthly — gives full lifetime history
+    let range: string;
+    if (limit > 500 || config.interval === '1d' || config.interval === '1wk' || config.interval === '1mo') {
+      range = 'max';
+    } else {
+      const rangeDays = Math.min(config.rangeMultiplier * Math.ceil(limit / 100), 730);
+      range = rangeDays < 8 ? `${rangeDays}d` : rangeDays < 60 ? `${Math.ceil(rangeDays / 30)}mo` : '2y';
+    }
 
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`;
     const resp = await axios.get<YahooV8Response>(url, {
       params: { interval: config.interval, range, includePrePost: false },
-      timeout: 8000,
-      headers: { 'User-Agent': 'Mozilla/5.0' },
+      timeout: 15000,
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
     });
 
     const result = resp.data.chart.result?.[0];
@@ -92,7 +99,39 @@ export class MarketDataService {
       });
     }
 
-    return { symbol, timeframe, bars: bars.slice(-limit) };
+    // Only slice if limit is explicitly small (analysis use case)
+    return { symbol, timeframe, bars: limit < 500 ? bars.slice(-limit) : bars };
+  }
+
+  async searchSymbols(query: string): Promise<Array<{ symbol: string; name: string; type: string; exchange: string }>> {
+    try {
+      const url = `https://query1.finance.yahoo.com/v1/finance/search`;
+      const resp = await axios.get(url, {
+        params: { q: query, quotesCount: 15, newsCount: 0, enableFuzzyQuery: false, quotesQueryId: 'tss_match_phrase_query' },
+        timeout: 5000,
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+      });
+
+      const quotes = resp.data.quotes ?? [];
+      return quotes
+        .filter((q: any) => q.symbol && q.quoteType !== 'FUTURE' || q.quoteType === 'FUTURE')
+        .map((q: any) => ({
+          symbol: q.symbol,
+          name: q.longname || q.shortname || q.symbol,
+          type: this.mapQuoteType(q.quoteType),
+          exchange: q.exchDisp || q.exchange || '',
+        }));
+    } catch {
+      return [];
+    }
+  }
+
+  private mapQuoteType(type: string): string {
+    const map: Record<string, string> = {
+      EQUITY: 'Stock', ETF: 'ETF', CRYPTOCURRENCY: 'Crypto',
+      FUTURE: 'Futures', CURRENCY: 'Forex', INDEX: 'Index', MUTUALFUND: 'Fund',
+    };
+    return map[type] ?? type ?? 'Stock';
   }
 
   private generateRealisticMock(symbol: string, timeframe: string, limit: number): OHLCVData {

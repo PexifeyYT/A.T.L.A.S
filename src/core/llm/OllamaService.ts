@@ -38,8 +38,34 @@ export class OllamaService {
   private available = false;
   private model: string | null = null;
   private chatHistory: { role: string; content: string }[] = [];
+  private anthropicKey: string | null = null;
 
   async init(): Promise<void> {
+    // Check for Anthropic API key first
+    this.anthropicKey = process.env.ANTHROPIC_API_KEY || null;
+
+    // Try to load from settings file
+    if (!this.anthropicKey) {
+      try {
+        const { app } = await import('electron');
+        const fs = await import('fs');
+        const path = await import('path');
+        const settingsPath = path.join(app.getPath('userData'), 'atlas-settings.json');
+        if (fs.existsSync(settingsPath)) {
+          const s = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+          if (s.anthropicApiKey) this.anthropicKey = s.anthropicApiKey;
+        }
+      } catch {}
+    }
+
+    if (this.anthropicKey) {
+      this.available = true;
+      this.model = 'claude-haiku-4-5';
+      console.log('ATLAS LLM: Claude API ready');
+      return;
+    }
+
+    // Try Ollama
     try {
       const resp = await axios.get(`${OLLAMA_BASE}/api/tags`, { timeout: 2000 });
       const models: string[] = (resp.data.models ?? []).map((m: any) => m.name as string);
@@ -61,7 +87,15 @@ export class OllamaService {
         console.log(`ATLAS LLM: Ollama connected — using ${this.model}`);
       }
     } catch {
-      console.log('ATLAS LLM: Ollama not available — using rule-based system');
+      console.log('ATLAS LLM: No LLM available — using rule-based system');
+    }
+  }
+
+  setAnthropicKey(key: string): void {
+    this.anthropicKey = key;
+    if (key) {
+      this.available = true;
+      this.model = 'claude-haiku-4-5';
     }
   }
 
@@ -75,9 +109,58 @@ export class OllamaService {
     performanceStats?: any;
   }): Promise<string> {
     if (this.available && this.model) {
+      if (this.anthropicKey && this.model.startsWith('claude')) {
+        return this.chatWithClaude(message, context);
+      }
       return this.chatWithOllama(message, context);
     }
     return this.ruleBasedChat(message, context);
+  }
+
+  private async chatWithClaude(message: string, context?: any): Promise<string> {
+    try {
+      let systemPrompt = ATLAS_SYSTEM_PROMPT;
+      if (context?.symbol) systemPrompt += `\n\nCURRENT CHART: ${context.symbol} on ${context.timeframe || '1D'} timeframe.`;
+      if (context?.analysisResult) {
+        const r = context.analysisResult;
+        systemPrompt += `\nLAST ANALYSIS: ${r.primarySignal?.direction} | Conviction: ${r.confidence?.toFixed(1)}/10 | Entry: $${r.primarySignal?.entryZone?.[0]?.toFixed(2)}–$${r.primarySignal?.entryZone?.[1]?.toFixed(2)} | T1: $${r.primarySignal?.target1?.toFixed(2)} | Invalidation: $${r.primarySignal?.invalidation?.toFixed(2)} | Modules agreed: ${r.modulesAgreed?.join(', ')}`;
+      }
+      if (context?.performanceStats) {
+        const p = context.performanceStats;
+        systemPrompt += `\nATLAS PERFORMANCE: ${(p.accuracy * 100)?.toFixed(1)}% accuracy | ${p.total} total calls`;
+      }
+
+      const messages = [
+        ...this.chatHistory.slice(-10).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+        { role: 'user' as const, content: message },
+      ];
+
+      const resp = await axios.post(
+        'https://api.anthropic.com/v1/messages',
+        {
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 800,
+          system: systemPrompt,
+          messages,
+        },
+        {
+          headers: {
+            'x-api-key': this.anthropicKey!,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+          },
+          timeout: 30000,
+        },
+      );
+
+      const reply: string = resp.data.content?.[0]?.text ?? 'No response';
+      this.chatHistory.push({ role: 'user', content: message });
+      this.chatHistory.push({ role: 'assistant', content: reply });
+      return reply;
+    } catch (err: any) {
+      console.warn('Claude API chat failed:', err?.response?.data || err.message);
+      return this.ruleBasedChat(message, context);
+    }
   }
 
   private async chatWithOllama(message: string, context?: any): Promise<string> {
@@ -220,6 +303,36 @@ export class OllamaService {
       return this.formatter.format(result);
     }
 
+    // Claude path
+    if (this.anthropicKey && this.model.startsWith('claude')) {
+      try {
+        const prompt = this.buildAnalysisPrompt(result);
+        const resp = await axios.post(
+          'https://api.anthropic.com/v1/messages',
+          {
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 600,
+            system: ATLAS_SYSTEM_PROMPT,
+            messages: [{ role: 'user', content: prompt }],
+          },
+          {
+            headers: {
+              'x-api-key': this.anthropicKey,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+            },
+            timeout: 30000,
+          },
+        );
+        const text: string = resp.data.content?.[0]?.text ?? '';
+        return text.trim() || this.formatter.format(result);
+      } catch (err: any) {
+        console.warn('Claude generateAnalysis failed:', err?.response?.data || err.message);
+        return this.formatter.format(result);
+      }
+    }
+
+    // Ollama path
     try {
       const prompt = this.buildAnalysisPrompt(result);
       const resp = await axios.post(

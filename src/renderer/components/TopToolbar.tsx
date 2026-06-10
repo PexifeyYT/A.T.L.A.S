@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SymbolSearch } from './SymbolSearch';
+import { SettingsModal } from './SettingsModal';
 
 interface TopToolbarProps {
   symbol: string;
@@ -25,6 +26,7 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
   scanning = false,
 }) => {
   const [showSearch, setShowSearch] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Global hotkey: / or Ctrl+K opens search
   useEffect(() => {
@@ -99,6 +101,14 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
           >
             {analyzing ? '⏳ ANALYZING...' : '🤖 ANALYZE'}
           </button>
+
+          <button
+            onClick={() => setShowSettings(true)}
+            title="Settings (API Keys)"
+            className="w-8 h-8 flex items-center justify-center text-tv-text-secondary hover:text-tv-text hover:bg-tv-surface2 rounded transition-colors text-base"
+          >
+            ⚙
+          </button>
         </div>
       </div>
 
@@ -107,6 +117,10 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
           onSelect={onSymbolChange}
           onClose={() => setShowSearch(false)}
         />
+      )}
+
+      {showSettings && (
+        <SettingsModal onClose={() => setShowSettings(false)} />
       )}
     </>
   );

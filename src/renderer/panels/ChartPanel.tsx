@@ -16,8 +16,17 @@ interface ChartPanelProps {
 
 type DrawingTool = 'cursor' | 'hline' | 'trendline' | 'fib' | 'text';
 
+interface Drawing {
+  id: string;
+  type: DrawingTool;
+  points: { x: number; y: number; price?: number; time?: number }[];
+  color: string;
+  label?: string;
+}
+
 export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analysisResult }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -30,9 +39,18 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
   const [replayPlaying, setReplayPlaying] = useState(false);
   const replayTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Drawing state
+  const [drawings, setDrawings] = useState<Drawing[]>([]);
+  const drawingsRef = useRef<Drawing[]>([]);
+  const activeDrawingRef = useRef<Drawing | null>(null);
+  const isDrawingRef = useRef(false);
+  const activeToolRef = useRef<DrawingTool>('cursor');
+
+  useEffect(() => { activeToolRef.current = activeTool; }, [activeTool]);
+  useEffect(() => { drawingsRef.current = drawings; }, [drawings]);
+
   // Build chart
   useEffect(() => {
-    // Run cleanup from previous render
     if (cleanupRef.current) {
       cleanupRef.current();
       cleanupRef.current = null;
@@ -47,7 +65,6 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
     setReplayMode(false);
     setReplayPlaying(false);
 
-    // Destroy old chart
     if (chartRef.current) {
       chartRef.current.remove();
       chartRef.current = null;
@@ -91,17 +108,17 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
     const ema21Series = chart.addLineSeries({
       color: '#f7a600',
       lineWidth: 1,
-      title: 'EMA21',
       priceLineVisible: false,
       lastValueVisible: false,
+      crosshairMarkerVisible: false,
     });
 
     const ema50Series = chart.addLineSeries({
       color: '#2962ff',
       lineWidth: 1,
-      title: 'EMA50',
       priceLineVisible: false,
       lastValueVisible: false,
+      crosshairMarkerVisible: false,
     });
 
     const volSeries = chart.addHistogramSeries({
@@ -115,7 +132,7 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
       scaleMargins: { top: 0.82, bottom: 0 },
     });
 
-    // Fetch data
+    // Fetch lifetime data — use large limit to get max range
     window.api.fetchMarketData(symbol, timeframe).then(result => {
       if (cancelled) return;
 
@@ -162,6 +179,8 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
           width: container.clientWidth,
           height: container.clientHeight,
         });
+        resizeOverlay();
+        redrawAll();
       }
     };
     window.addEventListener('resize', handleResize);
@@ -233,7 +252,193 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
     }
   }, [analysisResult]);
 
-  // Replay
+  // ─── Drawing overlay ─────────────────────────────────────────────────────────
+  const resizeOverlay = useCallback(() => {
+    const canvas = overlayRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+  }, []);
+
+  useEffect(() => {
+    resizeOverlay();
+  }, [resizeOverlay]);
+
+  const redrawAll = useCallback(() => {
+    const canvas = overlayRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (const d of drawingsRef.current) {
+      drawShape(ctx, d, canvas);
+    }
+    if (activeDrawingRef.current) {
+      drawShape(ctx, activeDrawingRef.current, canvas);
+    }
+  }, []);
+
+  const drawShape = (ctx: CanvasRenderingContext2D, d: Drawing, canvas: HTMLCanvasElement) => {
+    if (d.points.length === 0) return;
+    ctx.strokeStyle = d.color;
+    ctx.fillStyle = d.color;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([]);
+    ctx.font = '12px monospace';
+
+    if (d.type === 'hline' && d.points.length >= 1) {
+      const y = d.points[0].y;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+      if (d.points[0].price != null) {
+        ctx.fillText(`$${d.points[0].price.toFixed(2)}`, canvas.width - 80, y - 4);
+      }
+    } else if (d.type === 'trendline' && d.points.length >= 2) {
+      ctx.beginPath();
+      ctx.moveTo(d.points[0].x, d.points[0].y);
+      ctx.lineTo(d.points[1].x, d.points[1].y);
+      ctx.stroke();
+      // Extend slightly
+      const dx = d.points[1].x - d.points[0].x;
+      const dy = d.points[1].y - d.points[0].y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len > 0) {
+        const ux = dx / len, uy = dy / len;
+        ctx.beginPath();
+        ctx.setLineDash([4, 4]);
+        ctx.moveTo(d.points[1].x, d.points[1].y);
+        ctx.lineTo(d.points[1].x + ux * 80, d.points[1].y + uy * 80);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    } else if (d.type === 'fib' && d.points.length >= 2) {
+      const y0 = d.points[0].y;
+      const y1 = d.points[1].y;
+      const levels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0];
+      const colors = ['#26a69a', '#2962ff', '#f7a600', '#ef5350', '#f7a600', '#2962ff', '#26a69a'];
+      levels.forEach((lvl, i) => {
+        const y = y0 + (y1 - y0) * lvl;
+        ctx.strokeStyle = colors[i];
+        ctx.fillStyle = colors[i];
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillText(`${(lvl * 100).toFixed(1)}%`, 6, y - 3);
+      });
+      ctx.strokeStyle = d.color;
+      ctx.fillStyle = d.color;
+    } else if (d.type === 'text' && d.points.length >= 1) {
+      ctx.font = 'bold 13px monospace';
+      ctx.fillStyle = '#f7a600';
+      ctx.fillText(d.label || 'Label', d.points[0].x, d.points[0].y);
+    }
+  };
+
+  const getPrice = useCallback((y: number): number | undefined => {
+    if (!chartRef.current || !candleSeriesRef.current) return undefined;
+    try {
+      return (candleSeriesRef.current as any).coordinateToPrice(y) ?? undefined;
+    } catch {
+      return undefined;
+    }
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const tool = activeToolRef.current;
+    if (tool === 'cursor') return;
+
+    const rect = overlayRef.current!.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const price = getPrice(y);
+
+    if (tool === 'hline') {
+      const d: Drawing = {
+        id: Math.random().toString(36).slice(2),
+        type: 'hline',
+        points: [{ x, y, price }],
+        color: '#f7a600',
+      };
+      setDrawings(prev => [...prev, d]);
+      drawingsRef.current = [...drawingsRef.current, d];
+      redrawAll();
+      return;
+    }
+
+    if (tool === 'text') {
+      const label = window.prompt('Label text:') || 'Note';
+      const d: Drawing = {
+        id: Math.random().toString(36).slice(2),
+        type: 'text',
+        points: [{ x, y, price }],
+        color: '#f7a600',
+        label,
+      };
+      setDrawings(prev => [...prev, d]);
+      drawingsRef.current = [...drawingsRef.current, d];
+      redrawAll();
+      return;
+    }
+
+    // trendline or fib: start drawing
+    const d: Drawing = {
+      id: Math.random().toString(36).slice(2),
+      type: tool,
+      points: [{ x, y, price }],
+      color: tool === 'fib' ? '#26a69a' : '#2962ff',
+    };
+    activeDrawingRef.current = d;
+    isDrawingRef.current = true;
+  }, [getPrice, redrawAll]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current || !activeDrawingRef.current) return;
+    const rect = overlayRef.current!.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const price = getPrice(y);
+
+    if (activeDrawingRef.current.points.length === 1) {
+      activeDrawingRef.current = {
+        ...activeDrawingRef.current,
+        points: [activeDrawingRef.current.points[0], { x, y, price }],
+      };
+    } else {
+      activeDrawingRef.current = {
+        ...activeDrawingRef.current,
+        points: [activeDrawingRef.current.points[0], { x, y, price }],
+      };
+    }
+    redrawAll();
+  }, [getPrice, redrawAll]);
+
+  const handleMouseUp = useCallback((_e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current || !activeDrawingRef.current) return;
+    isDrawingRef.current = false;
+    if (activeDrawingRef.current.points.length >= 2) {
+      const d = activeDrawingRef.current;
+      setDrawings(prev => [...prev, d]);
+      drawingsRef.current = [...drawingsRef.current, d];
+    }
+    activeDrawingRef.current = null;
+    redrawAll();
+  }, [redrawAll]);
+
+  const clearDrawings = useCallback(() => {
+    setDrawings([]);
+    drawingsRef.current = [];
+    activeDrawingRef.current = null;
+    redrawAll();
+  }, [redrawAll]);
+
+  // ─── Replay ──────────────────────────────────────────────────────────────────
   const startReplay = useCallback(() => {
     if (allBars.length === 0 || !candleSeriesRef.current) return;
     setReplayMode(true);
@@ -268,9 +473,7 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
     } else {
       if (replayTimer.current) clearInterval(replayTimer.current);
     }
-    return () => {
-      if (replayTimer.current) clearInterval(replayTimer.current);
-    };
+    return () => { if (replayTimer.current) clearInterval(replayTimer.current); };
   }, [replayPlaying, replayMode, stepReplay]);
 
   const tools: { id: DrawingTool; icon: string; label: string }[] = [
@@ -299,6 +502,16 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
             {tool.icon}
           </button>
         ))}
+
+        {drawings.length > 0 && (
+          <button
+            onClick={clearDrawings}
+            title="Clear drawings"
+            className="w-7 h-7 text-xs rounded flex items-center justify-center text-tv-red hover:bg-tv-red/10 transition-colors"
+          >
+            🗑
+          </button>
+        )}
 
         <div className="w-px h-4 bg-tv-border mx-1" />
 
@@ -332,18 +545,40 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
         )}
 
         <div className="ml-auto flex items-center gap-3 text-xs text-tv-text-secondary">
-          <span className="text-tv-orange">EMA<span className="text-yellow-400">21</span></span>
-          <span className="text-tv-accent">EMA<span className="text-blue-400">50</span></span>
-          <span className="text-tv-text-secondary opacity-60">Vol</span>
+          <span>
+            <span className="inline-block w-3 h-0.5 bg-yellow-400 mr-1 align-middle" />
+            <span className="text-yellow-400">EMA21</span>
+          </span>
+          <span>
+            <span className="inline-block w-3 h-0.5 bg-tv-accent mr-1 align-middle" />
+            <span className="text-tv-accent">EMA50</span>
+          </span>
+          <span className="opacity-60">Vol</span>
+          {allBars.length > 0 && (
+            <span className="opacity-60">{allBars.length} bars</span>
+          )}
         </div>
       </div>
 
-      {/* Chart */}
-      <div
-        ref={containerRef}
-        className="flex-1 min-h-0"
-        style={{ cursor: activeTool === 'cursor' ? 'default' : 'crosshair' }}
-      />
+      {/* Chart + drawing overlay */}
+      <div className="flex-1 min-h-0 relative">
+        <div
+          ref={containerRef}
+          className="absolute inset-0"
+          style={{ cursor: activeTool === 'cursor' ? 'default' : 'crosshair' }}
+        />
+        <canvas
+          ref={overlayRef}
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            pointerEvents: activeTool !== 'cursor' ? 'auto' : 'none',
+            cursor: activeTool !== 'cursor' ? 'crosshair' : 'default',
+          }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+        />
+      </div>
 
       {/* Loading overlay */}
       {loading && (
@@ -367,6 +602,16 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
           <div className="text-tv-red text-sm mb-1">⚠ Failed to load {symbol}</div>
           <div className="text-tv-text-secondary text-xs">{error}</div>
           <div className="text-tv-text-secondary text-xs mt-2">Using cached/mock data</div>
+        </div>
+      )}
+
+      {/* Drawing mode hint */}
+      {activeTool !== 'cursor' && !loading && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-tv-surface/90 border border-tv-border rounded px-3 py-1.5 text-xs text-tv-text-secondary pointer-events-none">
+          {activeTool === 'hline' && 'Click anywhere to place horizontal line'}
+          {activeTool === 'trendline' && 'Click and drag to draw trend line'}
+          {activeTool === 'fib' && 'Click and drag to place Fibonacci levels'}
+          {activeTool === 'text' && 'Click to place text label'}
         </div>
       )}
     </div>

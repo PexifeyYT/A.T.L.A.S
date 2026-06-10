@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PerformancePanel } from './PerformancePanel';
 import { ChatPanel } from './ChatPanel';
 
@@ -85,45 +85,59 @@ export const RightPanel: React.FC<RightPanelProps> = ({
   );
 };
 
+const WATCHLIST_SYMBOLS = [
+  { symbol: 'AAPL', name: 'Apple' },
+  { symbol: 'MSFT', name: 'Microsoft' },
+  { symbol: 'TSLA', name: 'Tesla' },
+  { symbol: 'NVDA', name: 'NVIDIA' },
+  { symbol: 'SPY', name: 'S&P 500 ETF' },
+  { symbol: 'QQQ', name: 'Nasdaq ETF' },
+  { symbol: 'BTC-USD', name: 'Bitcoin' },
+  { symbol: 'ETH-USD', name: 'Ethereum' },
+  { symbol: 'GOOGL', name: 'Alphabet' },
+  { symbol: 'AMZN', name: 'Amazon' },
+];
+
 const WatchlistContent: React.FC = () => {
-  const [prices] = useState<Record<string, { price: number; change: number }>>({});
+  const [prices, setPrices] = useState<Record<string, { price: number; changePercent: number }>>({});
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const watchlist = [
-    { symbol: 'AAPL', name: 'Apple' },
-    { symbol: 'MSFT', name: 'Microsoft' },
-    { symbol: 'TSLA', name: 'Tesla' },
-    { symbol: 'NVDA', name: 'NVIDIA' },
-    { symbol: 'SPY', name: 'S&P 500 ETF' },
-    { symbol: 'QQQ', name: 'Nasdaq ETF' },
-    { symbol: 'BTC-USD', name: 'Bitcoin' },
-    { symbol: 'ETH-USD', name: 'Ethereum' },
-    { symbol: 'GOOGL', name: 'Alphabet' },
-    { symbol: 'AMZN', name: 'Amazon' },
-  ];
+  const fetchAll = useCallback(async () => {
+    const updates: Record<string, { price: number; changePercent: number }> = {};
+    await Promise.allSettled(
+      WATCHLIST_SYMBOLS.map(async ({ symbol }) => {
+        try {
+          const res = await window.api.fetchLiveQuote(symbol);
+          if (res.success && res.data) {
+            updates[symbol] = { price: res.data.price, changePercent: res.data.changePercent };
+          }
+        } catch {}
+      })
+    );
+    if (Object.keys(updates).length > 0) {
+      setPrices(prev => ({ ...prev, ...updates }));
+      setLastUpdate(new Date());
+    }
+  }, []);
 
-  // Static fallback prices — real prices load from Yahoo
-  const fallback: Record<string, { price: number; change: number }> = {
-    AAPL: { price: 211.45, change: 1.2 },
-    MSFT: { price: 442.30, change: -0.4 },
-    TSLA: { price: 248.50, change: 3.1 },
-    NVDA: { price: 131.20, change: 2.8 },
-    SPY: { price: 561.80, change: 0.5 },
-    QQQ: { price: 491.20, change: 0.7 },
-    'BTC-USD': { price: 67420, change: -1.2 },
-    'ETH-USD': { price: 3540, change: -0.8 },
-    GOOGL: { price: 178.60, change: 0.9 },
-    AMZN: { price: 196.30, change: 1.4 },
-  };
+  useEffect(() => {
+    fetchAll();
+    const interval = setInterval(fetchAll, 15000); // poll every 15s
+    return () => clearInterval(interval);
+  }, [fetchAll]);
 
   return (
     <div>
       <div className="flex items-center justify-between px-3 py-2 border-b border-tv-border">
         <span className="text-xs font-bold text-tv-text">WATCHLIST</span>
-        <span className="text-xs text-tv-text-secondary">10 symbols</span>
+        <span className="text-xs text-tv-text-secondary">
+          {lastUpdate ? `Updated ${lastUpdate.toLocaleTimeString()}` : 'Loading...'}
+        </span>
       </div>
-      {watchlist.map(item => {
-        const data = prices[item.symbol] ?? fallback[item.symbol] ?? { price: 0, change: 0 };
-        const isUp = data.change >= 0;
+      {WATCHLIST_SYMBOLS.map(item => {
+        const data = prices[item.symbol];
+        const isUp = (data?.changePercent ?? 0) >= 0;
         return (
           <div
             key={item.symbol}
@@ -134,12 +148,18 @@ const WatchlistContent: React.FC = () => {
               <div className="text-xs text-tv-text-secondary">{item.name}</div>
             </div>
             <div className="text-right">
-              <div className="text-sm font-mono text-tv-text">
-                ${data.price > 1000 ? data.price.toLocaleString() : data.price.toFixed(2)}
-              </div>
-              <div className={`text-xs font-medium ${isUp ? 'text-tv-green' : 'text-tv-red'}`}>
-                {isUp ? '+' : ''}{data.change.toFixed(2)}%
-              </div>
+              {data ? (
+                <>
+                  <div className="text-sm font-mono text-tv-text">
+                    ${data.price > 1000 ? data.price.toLocaleString(undefined, { maximumFractionDigits: 2 }) : data.price.toFixed(2)}
+                  </div>
+                  <div className={`text-xs font-medium ${isUp ? 'text-tv-green' : 'text-tv-red'}`}>
+                    {isUp ? '+' : ''}{data.changePercent.toFixed(2)}%
+                  </div>
+                </>
+              ) : (
+                <div className="text-xs text-tv-text-secondary animate-pulse">—</div>
+              )}
             </div>
           </div>
         );

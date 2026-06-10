@@ -11,4 +11,8 @@ contextBridge.exposeInMainWorld('api', {
   getLlmStatus: () => ipcRenderer.invoke('get-llm-status'),
   chatMessage: (message: string, context: any) =>
     ipcRenderer.invoke('chat-message', message, context),
+  searchSymbols: (query: string) => ipcRenderer.invoke('search-symbols', query),
+  fetchLiveQuote: (symbol: string) => ipcRenderer.invoke('fetch-live-quote', symbol),
+  saveSettings: (settings: any) => ipcRenderer.invoke('save-settings', settings),
+  loadSettings: () => ipcRenderer.invoke('load-settings'),
 });
