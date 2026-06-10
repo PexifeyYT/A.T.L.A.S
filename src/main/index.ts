@@ -163,7 +163,8 @@ async function runLearningLoop() {
 
       for (const moduleName of prediction.modulesAgreed) {
         const currentWeight = getModuleWeight(moduleName) ?? defaultWeights.get(moduleName) ?? 1.0;
-        const reward = outcome.directionCorrect ? 0.05 : -0.05;
+        // Normalize score (-3..+11) to reward in range ~(-0.03..+0.10)
+        const reward = (outcome.score / 110);
         const newWeight = Math.max(0.1, Math.min(2.0, currentWeight + reward));
         setModuleWeight(moduleName, newWeight);
       }
