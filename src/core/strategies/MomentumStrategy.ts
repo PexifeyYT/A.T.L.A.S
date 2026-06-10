@@ -189,13 +189,13 @@ export class MomentumStrategy implements IStrategyModule {
       return data.reduce((sum, item) => sum + (item.close || item), 0) / data.length;
     }
 
-    const closes = data.slice(-period).map((item) => item.close || item);
-    const sma = closes.reduce((a, b) => a + b, 0) / period;
+    const closes = data.slice(0, period).map((item: any) => item.close ?? item);
+    const sma = closes.reduce((a: number, b: number) => a + b, 0) / period;
     const multiplier = 2 / (period + 1);
 
     let ema = sma;
     for (let i = period; i < data.length; i++) {
-      const close = data[i].close || data[i];
+      const close = data[i].close ?? data[i];
       ema = close * multiplier + ema * (1 - multiplier);
     }
 

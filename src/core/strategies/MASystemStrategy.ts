@@ -149,8 +149,8 @@ export class MASystemStrategy implements IStrategyModule {
       return bars.reduce((sum, b) => sum + b.close, 0) / bars.length;
     }
 
-    const closes = bars.slice(-period).map((b) => b.close);
-    const sma = closes.reduce((a, b) => a + b, 0) / period;
+    const seedCloses = bars.slice(0, period).map((b: any) => b.close);
+    const sma = seedCloses.reduce((a: number, b: number) => a + b, 0) / period;
     const multiplier = 2 / (period + 1);
 
     let ema = sma;

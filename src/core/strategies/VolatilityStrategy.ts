@@ -26,10 +26,17 @@ export class VolatilityStrategy implements IStrategyModule {
 
     // Bollinger Bands squeeze (low volatility setup)
     const bandWidth = bb.upper - bb.lower;
-    const avgBandWidth =
-      (Math.max(...bars.slice(-20).map((b) => b.high)) -
-        Math.min(...bars.slice(-20).map((b) => b.low))) /
-      20;
+    // Historical average BB bandwidth over last 50 bars
+    let bwSum = 0;
+    const lookback = Math.min(50, bars.length - 20);
+    for (let i = 0; i < lookback; i++) {
+      const slice = bars.slice(i, i + 20);
+      const c = slice.map((b: any) => b.close);
+      const m = c.reduce((a: number, v: number) => a + v, 0) / 20;
+      const sd = Math.sqrt(c.reduce((a: number, v: number) => a + (v - m) ** 2, 0) / 20);
+      bwSum += sd * 4;
+    }
+    const avgBandWidth = lookback > 0 ? bwSum / lookback : bandWidth;
 
     if (bandWidth < avgBandWidth * 0.5) {
       // Squeeze detected — expansion coming
