@@ -17,6 +17,7 @@ import { SentimentStrategy } from '../core/strategies/SentimentStrategy';
 import { SeasonalityStrategy } from '../core/strategies/SeasonalityStrategy';
 import { OrderFlowStrategy } from '../core/strategies/OrderFlowStrategy';
 import { LearningEngine } from '../core/learning/LearningEngine';
+import { OllamaService } from '../core/llm/OllamaService';
 import { OutcomeChecker } from '../core/learning/OutcomeChecker';
 import {
   initDatabase,
@@ -39,6 +40,7 @@ const analysisEngine = new AnalysisEngine();
 const marketDataService = new MarketDataService();
 const learningEngine = new LearningEngine();
 const outcomeChecker = new OutcomeChecker(marketDataService);
+const ollamaService = new OllamaService();
 
 const allModuleNames = [
   'mod_smc', 'mod_tjr', 'mod_wyckoff', 'mod_elliott', 'mod_volume_profile',
@@ -109,6 +111,9 @@ app.on('ready', () => {
   } catch (err) {
     console.error('DB init failed:', err);
   }
+
+  // Try to connect to local Ollama LLM
+  ollamaService.init().catch(() => {});
 
   createWindow();
 
@@ -185,6 +190,11 @@ ipcMain.handle(
 
       const result = await analysisEngine.analyze(ohlcvData, context);
 
+      // Generate LLM narrative (Ollama if available, else rule-based)
+      const llmText = await ollamaService.generateAnalysis(result);
+      (result as any).llmText = llmText;
+      (result as any).llmModel = ollamaService.getModel() ?? 'rule-based';
+
       // Auto-save prediction if signal is strong enough
       if (result.confidence >= 6.0 && result.primarySignal.direction !== 'NEUTRAL') {
         const prediction: Prediction = {
@@ -249,4 +259,14 @@ ipcMain.handle('get-symbol-data', async (_event, symbol: string) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return { success: false, error: errorMessage };
   }
+});
+
+ipcMain.handle('get-llm-status', async () => {
+  return {
+    success: true,
+    data: {
+      available: ollamaService.isAvailable(),
+      model: ollamaService.getModel(),
+    },
+  };
 });

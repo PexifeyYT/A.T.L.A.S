@@ -220,10 +220,19 @@ const AnalysisContent: React.FC<{
           </div>
         </div>
 
-        {/* Explanation */}
+        {/* LLM narrative or rule-based rationale */}
         <div className="bg-tv-surface2 rounded p-3">
-          <div className="text-tv-text font-semibold mb-1">📊 SIGNAL RATIONALE</div>
-          <div className="text-tv-text-secondary leading-relaxed">{primary.explanation}</div>
+          <div className="text-tv-text font-semibold mb-1 flex items-center gap-2">
+            📊 ANALYSIS NARRATIVE
+            {result.llmModel && result.llmModel !== 'rule-based' && (
+              <span className="text-xs text-tv-green bg-tv-green/10 px-1.5 py-0.5 rounded">
+                🤖 {result.llmModel}
+              </span>
+            )}
+          </div>
+          <div className="text-tv-text-secondary leading-relaxed whitespace-pre-wrap text-xs">
+            {result.llmText || primary.explanation}
+          </div>
         </div>
 
         {/* Key Levels */}
