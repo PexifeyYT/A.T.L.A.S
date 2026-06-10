@@ -96,6 +96,7 @@ export class AnalysisEngine {
   private mergeKeyLevels(levels: any[]) {
     if (levels.length === 0) return [];
     const sorted = [...levels].filter(l => l.price > 0).sort((a, b) => a.price - b.price);
+    if (sorted.length === 0) return [];
     const clusters: any[][] = [[sorted[0]]];
 
     for (let i = 1; i < sorted.length; i++) {
