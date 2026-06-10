@@ -329,9 +329,9 @@ ipcMain.handle('save-settings', async (_e, settings: any) => {
     const path = await import('path');
     const settingsPath = path.join(app.getPath('userData'), 'atlas-settings.json');
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-    if (settings.anthropicApiKey) {
-      process.env.ANTHROPIC_API_KEY = settings.anthropicApiKey;
-      ollamaService.setAnthropicKey(settings.anthropicApiKey);
+    if (settings.anthropicApiKey !== undefined) {
+      process.env.ANTHROPIC_API_KEY = settings.anthropicApiKey || '';
+      ollamaService.setAnthropicKey(settings.anthropicApiKey || '');
     }
     return { success: true };
   } catch (error) {
