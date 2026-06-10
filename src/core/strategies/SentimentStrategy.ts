@@ -34,7 +34,7 @@ export class SentimentStrategy implements IStrategyModule {
         target1: lastBar.close * 1.04,
         target2: lastBar.close * 1.08,
         invalidation: lastBar.low,
-        explanation: 'News sentiment bullish (>${newsSentiment.toFixed(2)}) + social volume spike',
+        explanation: `News sentiment proxy bullish (${(newsSentiment * 100).toFixed(0)}%) + momentum volume spike`,
         moduleName: this.name,
         weight: this.weight,
       };
@@ -49,7 +49,7 @@ export class SentimentStrategy implements IStrategyModule {
         target1: lastBar.close * 0.96,
         target2: lastBar.close * 0.92,
         invalidation: lastBar.high,
-        explanation: 'News sentiment bearish (<${newsSentiment.toFixed(2)}) + social volume spike',
+        explanation: `News sentiment proxy bearish (${(newsSentiment * 100).toFixed(0)}%) + negative momentum volume`,
         moduleName: this.name,
         weight: this.weight,
       };

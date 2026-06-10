@@ -76,27 +76,40 @@ export class IntermarketStrategy implements IStrategyModule {
   }
 
   private simulateDXYTrend(bars: any[]): number {
-    // Inverse correlation: when DXY strong, equities weak
-    // Simplified: estimate based on price volatility
-    const recent = bars.slice(-20);
-    const avgClose =
-      recent.reduce((sum, b) => sum + b.close, 0) / recent.length;
-
-    return (bars[bars.length - 1].close - avgClose) / avgClose;
+    // Use recent price momentum as a proxy for risk appetite
+    // Strong upward price momentum = risk-on (DXY typically weak in this env)
+    const r20 = bars.slice(-20);
+    const r5 = bars.slice(-5);
+    const avg20 = r20.reduce((s: number, b: any) => s + b.close, 0) / r20.length;
+    const avg5 = r5.reduce((s: number, b: any) => s + b.close, 0) / r5.length;
+    // Positive = price above average = risk-on = DXY "weak"
+    return (avg5 - avg20) / avg20;
   }
 
   private detectRiskRegime(bars: any[]): 'risk-on' | 'risk-off' | 'neutral' {
-    // Simplified: detect based on volatility and direction
     const recent = bars.slice(-30);
-    const volatility = (Math.max(...recent.map((b) => b.high)) -
-      Math.min(...recent.map((b) => b.low))) /
-      Math.min(...recent.map((b) => b.low));
+    // Volatility: ATR vs price ratio
+    let atrSum = 0;
+    for (let i = 1; i < recent.length; i++) {
+      atrSum += Math.max(
+        recent[i].high - recent[i].low,
+        Math.abs(recent[i].high - recent[i - 1].close),
+        Math.abs(recent[i].low - recent[i - 1].close),
+      );
+    }
+    const atrPct = (atrSum / (recent.length - 1)) / recent[recent.length - 1].close;
+
+    // Volume: compare recent 5 bar avg vol to 30 bar avg vol
+    const avgVol30 = recent.reduce((s: number, b: any) => s + b.volume, 0) / recent.length;
+    const avgVol5 = recent.slice(-5).reduce((s: number, b: any) => s + b.volume, 0) / 5;
+    const volRatio = avgVol5 / (avgVol30 || 1);
 
     const trend = bars[bars.length - 1].close > recent[0].close;
 
-    if (volatility > 0.08 && !trend) return 'risk-off';
-    if (volatility < 0.05 && trend) return 'risk-on';
-
+    // Risk-off: high vol, high ATR, downtrending
+    if (atrPct > 0.02 && !trend && volRatio > 1.2) return 'risk-off';
+    // Risk-on: low ATR, uptrending, stable volume
+    if (atrPct < 0.012 && trend && volRatio < 1.3) return 'risk-on';
     return 'neutral';
   }
 
