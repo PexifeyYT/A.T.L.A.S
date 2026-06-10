@@ -136,9 +136,9 @@ export function saveOutcome(outcome: PredictionOutcome): void {
   );
 }
 
-export function getModuleWeight(moduleName: string): number {
+export function getModuleWeight(moduleName: string): number | null {
   const row = db.prepare('SELECT weight FROM module_weights WHERE module_name = ?').get(moduleName) as any;
-  return row?.weight ?? 1.0;
+  return row?.weight ?? null;
 }
 
 export function setModuleWeight(moduleName: string, weight: number): void {
