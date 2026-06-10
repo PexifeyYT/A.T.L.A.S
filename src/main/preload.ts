@@ -9,4 +9,6 @@ contextBridge.exposeInMainWorld('api', {
   getPerformanceStats: () => ipcRenderer.invoke('get-performance-stats'),
   getAssetProfile: (symbol: string) => ipcRenderer.invoke('get-asset-profile', symbol),
   getLlmStatus: () => ipcRenderer.invoke('get-llm-status'),
+  chatMessage: (message: string, context: any) =>
+    ipcRenderer.invoke('chat-message', message, context),
 });

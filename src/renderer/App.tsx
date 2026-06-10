@@ -7,12 +7,14 @@ import { RightPanel } from '@/renderer/panels/RightPanel';
 import { BottomBar } from '@/renderer/components/BottomBar';
 import { ScanResultsPanel } from '@/renderer/panels/ScanResultsPanel';
 
+type RightPanelTab = 'watchlist' | 'info' | 'analysis' | 'performance' | 'chat';
+
 const SCAN_SYMBOLS = ['AAPL', 'MSFT', 'TSLA', 'NVDA', 'GOOGL', 'AMZN', 'META', 'AMD', 'SPY', 'QQQ'];
 
 export default function App() {
   const [symbol, setSymbol] = useState('AAPL');
   const [timeframe, setTimeframe] = useState('1D');
-  const [rightPanelTab, setRightPanelTab] = useState<'watchlist' | 'info' | 'analysis' | 'performance'>('analysis');
+  const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('analysis');
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -62,10 +64,9 @@ export default function App() {
         results.push({ symbol: sym, ...ar.data });
         setScanResults([...results]);
       } catch {
-        // skip failed symbols
+        // skip failed symbol
       }
     }
-
     setScanning(false);
   };
 
@@ -103,6 +104,7 @@ export default function App() {
             analysisLoading={analysisLoading}
             analysisError={analysisError}
             symbol={symbol}
+            timeframe={timeframe}
           />
         )}
       </div>

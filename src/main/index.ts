@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
-import isDev from 'electron-is-dev';
+
+const isDev = !app.isPackaged;
 import { AnalysisEngine } from '../core/engine/AnalysisEngine';
 import { MarketDataService } from '../core/data/MarketDataService';
 import { SMCStrategy } from '../core/strategies/SMCStrategy';
@@ -269,4 +270,14 @@ ipcMain.handle('get-llm-status', async () => {
       model: ollamaService.getModel(),
     },
   };
+});
+
+ipcMain.handle('chat-message', async (_event, message: string, context: any) => {
+  try {
+    const reply = await ollamaService.chat(message, context);
+    return { success: true, data: reply };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
 });
