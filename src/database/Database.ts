@@ -188,27 +188,40 @@ export function getStats(): any {
   };
 }
 
+const TF_MS: Record<string, number> = {
+  '1m': 60e3, '5m': 5*60e3, '15m': 15*60e3, '30m': 30*60e3,
+  '1H': 3600e3, '2H': 2*3600e3, '4H': 4*3600e3,
+  '1D': 86400e3, '1W': 7*86400e3, '1M': 30*86400e3,
+};
+
 export function getPendingPredictions(): Prediction[] {
+  // Fetch all pending predictions — filter by timeframe-aware horizon below
   const rows = db.prepare(`
     SELECT * FROM predictions WHERE status = 'PENDING'
-    AND timestamp < ?
-  `).all(Date.now() - 86400000) as any[];
+  `).all() as any[];
 
-  return rows.map((row) => ({
-    id: row.id,
-    symbol: row.symbol,
-    timeframe: row.timeframe,
-    timestamp: row.timestamp,
-    direction: row.direction,
-    entryZone: [row.entry_low, row.entry_high] as [number, number],
-    target1: row.target1,
-    target2: row.target2,
-    invalidation: row.invalidation,
-    horizonBars: row.horizon_bars,
-    modulesAgreed: JSON.parse(row.modules_agreed || '[]'),
-    conviction: row.conviction,
-    status: row.status,
-  }));
+  const now = Date.now();
+  return rows
+    .filter((row) => {
+      const barMs = TF_MS[row.timeframe] ?? 86400e3;
+      const minAge = barMs * (row.horizon_bars ?? 12) * 0.5; // check at 50% of horizon
+      return now - row.timestamp >= minAge;
+    })
+    .map((row) => ({
+      id: row.id,
+      symbol: row.symbol,
+      timeframe: row.timeframe,
+      timestamp: row.timestamp,
+      direction: row.direction,
+      entryZone: [row.entry_low, row.entry_high] as [number, number],
+      target1: row.target1,
+      target2: row.target2,
+      invalidation: row.invalidation,
+      horizonBars: row.horizon_bars,
+      modulesAgreed: JSON.parse(row.modules_agreed || '[]'),
+      conviction: row.conviction,
+      status: row.status,
+    }));
 }
 
 export function getDatabase(): Database.Database {
