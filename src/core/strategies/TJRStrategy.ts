@@ -4,11 +4,12 @@ import {
   OHLCVData,
   MarketContext,
   PriceLevel,
+  OHLCV,
 } from '@core/types';
 
 /**
  * TJR Strategy Constitution
- * Core rules: HTF bias → LTF market structure → OB/FVG entry → Risk/reward minimum 2.5
+ * HTF bias → LTF market structure break → OB/FVG entry → minimum 2.5:1 R:R
  */
 export class TJRStrategy implements IStrategyModule {
   name = 'mod_tjr';
@@ -16,154 +17,149 @@ export class TJRStrategy implements IStrategyModule {
 
   analyze(data: OHLCVData, _context: MarketContext): StrategySignal {
     const bars = data.bars;
-    if (bars.length < 50) {
-      return this.neutralSignal();
-    }
+    if (bars.length < 50) return this.neutralSignal();
 
-    // Find market structure (BOS/CHoCH)
-    const structure = this.findMarketStructure(bars);
+    // Step 1: HTF bias — use last 50 bars trend
+    const htfBias = this.getHTFBias(bars.slice(-50));
 
-    if (!structure) {
-      return this.neutralSignal();
-    }
+    // Step 2: LTF structure — recent 20 bars
+    const ltf = bars.slice(-20);
+    const ltfStructure = this.getLTFStructure(ltf);
 
-    // Find order block or FVG for entry
-    const entryLevel = this.findEntryZone(bars, structure.direction);
-    if (!entryLevel) {
-      return this.neutralSignal();
-    }
+    if (!ltfStructure || ltfStructure !== htfBias) return this.neutralSignal();
 
-    const lastBar = bars[bars.length - 1];
-    const riskReward = this.calculateRiskReward(lastBar.close, entryLevel, structure.direction);
+    // Step 3: Find OB or FVG entry
+    const entry = this.findBestEntry(bars.slice(-15), htfBias);
+    if (!entry) return this.neutralSignal();
 
-    if (riskReward < 2.5) {
-      return this.neutralSignal();
-    }
+    const last = bars[bars.length - 1];
+    const allHighs = bars.slice(-50).map(b => b.high);
+    const allLows = bars.slice(-50).map(b => b.low);
+    const structureHigh = Math.max(...allHighs);
+    const structureLow = Math.min(...allLows);
 
-    if (structure.direction === 'up') {
+    if (htfBias === 'up') {
+      const stopLoss = Math.min(entry.low, structureLow) - last.close * 0.001;
+      const risk = entry.mid - stopLoss;
+      if (risk <= 0) return this.neutralSignal();
+
+      const t1 = entry.mid + risk * 2.5;
+      const t2 = entry.mid + risk * 4.0;
+      const rr = (t1 - entry.mid) / risk;
+
+      if (rr < 2.5) return this.neutralSignal();
+
       return {
         direction: 'LONG',
-        confidence: 0.75,
-        entryZone: [entryLevel.low, entryLevel.high],
-        target1: entryLevel.high * 1.06,
-        target2: entryLevel.high * 1.12,
-        invalidation: entryLevel.low - 2,
-        explanation: 'TJR: HTF bias + BOS + OB retest with 2.5+ RR',
+        confidence: Math.min(0.7 + Math.min(rr / 20, 0.15), 0.88),
+        entryZone: [entry.low, entry.high],
+        target1: t1,
+        target2: t2,
+        invalidation: stopLoss,
+        explanation: `TJR LONG — HTF uptrend + LTF BOS + ${entry.type} @ ${entry.mid.toFixed(2)}, R:R ${rr.toFixed(1)}:1`,
         moduleName: this.name,
         weight: this.weight,
       };
     }
 
-    return {
-      direction: 'SHORT',
-      confidence: 0.68,
-      entryZone: [entryLevel.high, entryLevel.low],
-      target1: entryLevel.low * 0.94,
-      target2: entryLevel.low * 0.88,
-      invalidation: entryLevel.high + 2,
-      explanation: 'TJR: HTF bias + CHoCH + OB retest with 2.5+ RR',
-      moduleName: this.name,
-      weight: this.weight,
-    };
-  }
+    if (htfBias === 'down') {
+      const stopLoss = Math.max(entry.high, structureHigh) + last.close * 0.001;
+      const risk = stopLoss - entry.mid;
+      if (risk <= 0) return this.neutralSignal();
 
-  getKeyLevels(data: OHLCVData): PriceLevel[] {
-    const bars = data.bars.slice(-50);
-    const levels: PriceLevel[] = [];
+      const t1 = entry.mid - risk * 2.5;
+      const t2 = entry.mid - risk * 4.0;
+      const rr = (entry.mid - t1) / risk;
 
-    // Identify order blocks (origin candle of a structure move)
-    const structure = this.findMarketStructure(bars);
-    if (structure) {
-      levels.push({
-        price: (structure.originHigh + structure.originLow) / 2,
-        type: 'orderblock',
-        strength: 0.85,
-        label: 'Order Block',
-      });
-    }
+      if (rr < 2.5) return this.neutralSignal();
 
-    return levels;
-  }
-
-  getConfidence(): number {
-    return 0.75;
-  }
-
-  getWeight(): number {
-    return this.weight;
-  }
-
-  getExplanation(): string {
-    return 'TJR Constitution: HTF bias → LTF structure break → OB/FVG entry → min 2.5 RR';
-  }
-
-  private findMarketStructure(
-    bars: any[],
-  ): { direction: 'up' | 'down'; originHigh: number; originLow: number } | null {
-    const recent = bars.slice(-20);
-
-    // Check for higher highs/lows
-    const highs = recent.map((b) => b.high);
-    const lows = recent.map((b) => b.low);
-
-    const lastHigh = highs[highs.length - 1];
-    const lastLow = lows[lows.length - 1];
-    const prevHighs = highs.slice(0, -1);
-    const prevLows = lows.slice(0, -1);
-
-    if (lastHigh > Math.max(...prevHighs) && lastLow > Math.min(...prevLows)) {
       return {
-        direction: 'up',
-        originHigh: Math.max(...prevHighs),
-        originLow: Math.min(...prevLows),
+        direction: 'SHORT',
+        confidence: Math.min(0.65 + Math.min(rr / 20, 0.15), 0.82),
+        entryZone: [entry.high, entry.low],
+        target1: t1,
+        target2: t2,
+        invalidation: stopLoss,
+        explanation: `TJR SHORT — HTF downtrend + LTF CHoCH + ${entry.type} @ ${entry.mid.toFixed(2)}, R:R ${rr.toFixed(1)}:1`,
+        moduleName: this.name,
+        weight: this.weight,
       };
     }
 
-    if (lastLow < Math.min(...prevLows) && lastHigh < Math.max(...prevHighs)) {
-      return {
-        direction: 'down',
-        originHigh: Math.max(...prevHighs),
-        originLow: Math.min(...prevLows),
-      };
+    return this.neutralSignal();
+  }
+
+  private getHTFBias(bars: OHLCV[]): 'up' | 'down' | 'neutral' {
+    if (bars.length < 20) return 'neutral';
+    const firstHalf = bars.slice(0, Math.floor(bars.length / 2));
+    const secondHalf = bars.slice(Math.floor(bars.length / 2));
+    const h1Avg = firstHalf.reduce((s, b) => s + b.close, 0) / firstHalf.length;
+    const h2Avg = secondHalf.reduce((s, b) => s + b.close, 0) / secondHalf.length;
+    const delta = (h2Avg - h1Avg) / h1Avg;
+    if (delta > 0.005) return 'up';
+    if (delta < -0.005) return 'down';
+    return 'neutral';
+  }
+
+  private getLTFStructure(bars: OHLCV[]): 'up' | 'down' | null {
+    if (bars.length < 4) return null;
+    const last = bars[bars.length - 1];
+    const prev = bars.slice(0, -1);
+    const prevHighMax = Math.max(...prev.map(b => b.high));
+    const prevLowMin = Math.min(...prev.map(b => b.low));
+
+    if (last.close > prevHighMax) return 'up';
+    if (last.close < prevLowMin) return 'down';
+    return null;
+  }
+
+  private findBestEntry(bars: OHLCV[], direction: 'up' | 'down'): { low: number; high: number; mid: number; type: string } | null {
+    // Try to find FVG first
+    for (let i = bars.length - 3; i >= 0; i--) {
+      const c1 = bars[i], c3 = bars[i + 2];
+      if (!c1 || !c3) continue;
+      if (direction === 'up' && c1.high < c3.low) {
+        const low = c1.high, high = c3.low;
+        return { low, high, mid: (low + high) / 2, type: 'FVG' };
+      }
+      if (direction === 'down' && c1.low > c3.high) {
+        const low = c3.high, high = c1.low;
+        return { low, high, mid: (low + high) / 2, type: 'FVG' };
+      }
+    }
+
+    // Fall back to OB
+    for (let i = bars.length - 2; i >= bars.length - 6; i--) {
+      const b = bars[i];
+      if (!b) continue;
+      if (direction === 'up' && b.close < b.open) {
+        return { low: b.low, high: b.high, mid: (b.low + b.high) / 2, type: 'OB' };
+      }
+      if (direction === 'down' && b.close > b.open) {
+        return { low: b.low, high: b.high, mid: (b.low + b.high) / 2, type: 'OB' };
+      }
     }
 
     return null;
   }
 
-  private findEntryZone(bars: any[], direction: 'up' | 'down') {
-    const recent = bars.slice(-15);
-
-    if (direction === 'up') {
-      const swingLow = Math.min(...recent.map((b) => b.low));
-      return { high: swingLow * 1.01, low: swingLow };
+  getKeyLevels(data: OHLCVData): PriceLevel[] {
+    const bars = data.bars.slice(-50);
+    const levels: PriceLevel[] = [];
+    const bias = this.getHTFBias(bars);
+    if (bias === 'neutral') return levels;
+    const entry = this.findBestEntry(bars.slice(-15), bias);
+    if (entry) {
+      levels.push({ price: entry.mid, type: entry.type === 'FVG' ? 'support' : 'orderblock', strength: 0.85, label: `TJR ${entry.type}` });
     }
-
-    const swingHigh = Math.max(...recent.map((b) => b.high));
-    return { high: swingHigh, low: swingHigh * 0.99 };
-  }
-
-  private calculateRiskReward(entry: number, zone: any, direction: 'up' | 'down'): number {
-    if (direction === 'up') {
-      const risk = entry - zone.low;
-      const reward = zone.high * 1.06 - entry;
-      return reward / risk;
-    }
-
-    const risk = zone.high - entry;
-    const reward = entry - zone.low * 0.94;
-    return reward / risk;
+    return levels;
   }
 
   private neutralSignal(): StrategySignal {
-    return {
-      direction: 'NEUTRAL',
-      confidence: 0,
-      entryZone: [0, 0],
-      target1: 0,
-      invalidation: 0,
-      explanation: 'No TJR setup identified',
-      moduleName: this.name,
-      weight: this.weight,
-    };
+    return { direction: 'NEUTRAL', confidence: 0, entryZone: [0, 0], target1: 0, invalidation: 0, explanation: 'No TJR setup', moduleName: this.name, weight: this.weight };
   }
+
+  getConfidence(): number { return 0.75; }
+  getWeight(): number { return this.weight; }
+  getExplanation(): string { return 'TJR: HTF bias → LTF BOS/CHoCH → FVG/OB entry → 2.5+ R:R'; }
 }
