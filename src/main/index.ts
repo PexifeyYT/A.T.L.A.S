@@ -192,11 +192,31 @@ ipcMain.handle('fetch-market-data', async (_e, symbol: string, timeframe: string
 
 ipcMain.handle('run-analysis', async (_e, symbol: string, timeframe: string, ohlcvData: OHLCVData) => {
   try {
+    // Compute dynamic context from bar data
+    const bars = ohlcvData.bars;
+    let macroTrend: 'UPTREND' | 'DOWNTREND' | 'SIDEWAYS' = 'SIDEWAYS';
+    let volatility = 0.5;
+    if (bars && bars.length >= 50) {
+      const recent = bars.slice(-50);
+      const first = recent[0].close;
+      const last = recent[recent.length - 1].close;
+      const trend = (last - first) / first;
+      if (trend > 0.05) macroTrend = 'UPTREND';
+      else if (trend < -0.05) macroTrend = 'DOWNTREND';
+      // ATR-based volatility (0-1 scale)
+      let atrSum = 0;
+      for (let i = 1; i < recent.length; i++) {
+        const b = recent[i], p = recent[i - 1];
+        atrSum += Math.max(b.high - b.low, Math.abs(b.high - p.close), Math.abs(b.low - p.close));
+      }
+      const avgAtr = atrSum / (recent.length - 1);
+      volatility = Math.min(1.0, (avgAtr / last) * 50); // normalize to 0-1
+    }
     const context: MarketContext = {
       symbol,
       timestamp: Date.now(),
-      macroTrend: 'UPTREND',
-      volatility: 0.5,
+      macroTrend,
+      volatility,
     };
 
     const result = await analysisEngine.analyze(ohlcvData, context);
