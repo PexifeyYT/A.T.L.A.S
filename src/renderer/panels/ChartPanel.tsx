@@ -16,7 +16,7 @@ interface ChartPanelProps {
   onToolChange?: (tool: DrawingTool) => void;
 }
 
-type DrawingTool = 'cursor' | 'hline' | 'trendline' | 'fib' | 'text';
+type DrawingTool = 'cursor' | 'hline' | 'vline' | 'trendline' | 'fib' | 'text';
 
 interface Drawing {
   id: string;
@@ -324,6 +324,14 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
       if (d.points[0].price != null) {
         ctx.fillText(`$${d.points[0].price.toFixed(2)}`, canvas.width - 80, y - 4);
       }
+    } else if (d.type === 'vline' && d.points.length >= 1) {
+      const x = d.points[0].x;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+      ctx.setLineDash([]);
     } else if (d.type === 'trendline' && d.points.length >= 2) {
       ctx.beginPath();
       ctx.moveTo(d.points[0].x, d.points[0].y);
@@ -391,6 +399,8 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
       let dist = Infinity;
       if (d.type === 'hline' && d.points.length >= 1) {
         dist = Math.abs(d.points[0].y - my);
+      } else if (d.type === 'vline' && d.points.length >= 1) {
+        dist = Math.abs(d.points[0].x - mx);
       } else if ((d.type === 'trendline' || d.type === 'fib') && d.points.length >= 2) {
         const p1 = d.points[0], p2 = d.points[1];
         const dx = p2.x - p1.x, dy = p2.y - p1.y;
@@ -429,6 +439,19 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
         type: 'hline',
         points: [{ x, y, price }],
         color: '#f7a600',
+      };
+      setDrawings(prev => [...prev, d]);
+      drawingsRef.current = [...drawingsRef.current, d];
+      redrawAll();
+      return;
+    }
+
+    if (tool === 'vline') {
+      const d: Drawing = {
+        id: Math.random().toString(36).slice(2),
+        type: 'vline',
+        points: [{ x, y, price }],
+        color: '#787b86',
       };
       setDrawings(prev => [...prev, d]);
       drawingsRef.current = [...drawingsRef.current, d];
@@ -557,6 +580,7 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
   const tools: { id: DrawingTool; icon: string; label: string }[] = [
     { id: 'cursor', icon: '↖', label: 'Cursor' },
     { id: 'hline', icon: '─', label: 'H-Line' },
+    { id: 'vline', icon: '│', label: 'V-Line' },
     { id: 'trendline', icon: '╱', label: 'Trend' },
     { id: 'fib', icon: 'φ', label: 'Fib' },
     { id: 'text', icon: 'T', label: 'Text' },
@@ -704,7 +728,8 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
       {/* Drawing mode hint */}
       {activeTool !== 'cursor' && !loading && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-tv-surface/90 border border-tv-border rounded px-3 py-1.5 text-xs text-tv-text-secondary pointer-events-none">
-          {activeTool === 'hline' && 'Click to place · Right-click to delete'}
+          {activeTool === 'hline' && 'Click to place horizontal line · Right-click to delete'}
+          {activeTool === 'vline' && 'Click to place vertical line · Right-click to delete'}
           {activeTool === 'trendline' && 'Click and drag to draw · Right-click to delete'}
           {activeTool === 'fib' && 'Click and drag for Fibonacci · Right-click to delete'}
           {activeTool === 'text' && 'Click to place label · Right-click to delete'}

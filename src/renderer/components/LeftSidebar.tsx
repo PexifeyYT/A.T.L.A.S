@@ -1,6 +1,6 @@
 import React from 'react';
 
-type DrawingTool = 'cursor' | 'hline' | 'trendline' | 'fib' | 'text';
+type DrawingTool = 'cursor' | 'hline' | 'vline' | 'trendline' | 'fib' | 'text';
 
 interface LeftSidebarProps {
   activeTool: DrawingTool;
@@ -12,6 +12,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeTool, onToolChan
     { id: 'cursor', label: 'Cursor (Esc)', icon: '↖' },
     { id: 'trendline', label: 'Trend Line', icon: '/' },
     { id: 'hline', label: 'Horizontal Line', icon: '─' },
+    { id: 'vline', label: 'Vertical Line', icon: '│' },
     { id: 'fib', label: 'Fibonacci Retracement', icon: 'φ' },
     { id: 'text', label: 'Text Label', icon: 'T' },
   ];
@@ -38,7 +39,6 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({ activeTool, onToolChan
       {/* Non-functional extras for UI completeness */}
       {[
         { icon: '⋈', label: 'Parallel Channel' },
-        { icon: '⊥', label: 'Vertical Line' },
         { icon: '~', label: 'Freehand' },
         { icon: '☁', label: 'Callout' },
       ].map(t => (

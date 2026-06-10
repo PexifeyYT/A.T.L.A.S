@@ -8,7 +8,7 @@ import { BottomBar } from '@/renderer/components/BottomBar';
 import { ScanResultsPanel } from '@/renderer/panels/ScanResultsPanel';
 
 type RightPanelTab = 'watchlist' | 'info' | 'analysis' | 'performance' | 'chat';
-type DrawingTool = 'cursor' | 'hline' | 'trendline' | 'fib' | 'text';
+type DrawingTool = 'cursor' | 'hline' | 'vline' | 'trendline' | 'fib' | 'text';
 
 const SCAN_SYMBOLS = ['AAPL', 'MSFT', 'TSLA', 'NVDA', 'GOOGL', 'AMZN', 'META', 'AMD', 'SPY', 'QQQ'];
 
