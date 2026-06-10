@@ -75,7 +75,7 @@ export class VolatilityStrategy implements IStrategyModule {
       return {
         direction: 'SHORT',
         confidence: 0.54,
-        entryZone: [lastBar.close, bb.upper],
+        entryZone: [Math.min(lastBar.close, bb.upper), Math.max(lastBar.close, bb.upper)],
         target1: bb.middle,
         target2: bb.lower,
         invalidation: bb.upper + atr,
@@ -90,7 +90,7 @@ export class VolatilityStrategy implements IStrategyModule {
       return {
         direction: 'LONG',
         confidence: 0.54,
-        entryZone: [bb.lower, lastBar.close],
+        entryZone: [Math.min(bb.lower, lastBar.close), Math.max(bb.lower, lastBar.close)],
         target1: bb.middle,
         target2: bb.upper,
         invalidation: bb.lower - atr,
