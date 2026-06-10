@@ -57,7 +57,6 @@ export interface AnalysisResult {
   timeframe: string;
   timestamp: number;
   primarySignal: StrategySignal;
-  alternateSignal?: StrategySignal;
   confidence: number; // 0-10
   modulesAgreed: string[];
   keyLevels: PriceLevel[];
@@ -65,7 +64,6 @@ export interface AnalysisResult {
   predictionId?: string;
   prediction: {
     scenario1: { direction: string; probability: number; target1: number; target2: number };
-    scenario2?: { direction: string; probability: number; target1: number; target2: number };
   };
 }
 

@@ -98,6 +98,7 @@ export class MASystemStrategy implements IStrategyModule {
     const bars = data.bars;
     if (bars.length < 200) return [];
 
+    const lastClose = bars[bars.length - 1].close;
     const ma9 = this.calculateEMA(bars, 9);
     const ma21 = this.calculateEMA(bars, 21);
     const ma50 = this.calculateEMA(bars, 50);
@@ -106,25 +107,25 @@ export class MASystemStrategy implements IStrategyModule {
     return [
       {
         price: ma200,
-        type: 'support',
+        type: lastClose >= ma200 ? 'support' : 'resistance',
         strength: 0.9,
         label: 'EMA 200 (long-term)',
       },
       {
         price: ma50,
-        type: 'support',
+        type: lastClose >= ma50 ? 'support' : 'resistance',
         strength: 0.8,
         label: 'EMA 50',
       },
       {
         price: ma21,
-        type: 'support',
+        type: lastClose >= ma21 ? 'support' : 'resistance',
         strength: 0.7,
         label: 'EMA 21',
       },
       {
         price: ma9,
-        type: 'support',
+        type: lastClose >= ma9 ? 'support' : 'resistance',
         strength: 0.6,
         label: 'EMA 9 (signal)',
       },
