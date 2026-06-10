@@ -49,15 +49,21 @@ export class AnalysisEngine {
     }
 
     // Minimum 3 modules must agree
-    const totalAgreed = signals.filter((s) => s.direction === strongestSignal.direction).length;
+    const agreedSignals = signals.filter((s) => s.direction === strongestSignal.direction);
+    const totalAgreed = agreedSignals.length;
     const canPublish = totalAgreed >= 3 && strongestSignal.direction !== 'NEUTRAL';
+
+    // Composite score: 60% avg signal confidence, 40% module coverage ratio
+    const avgConfidence = agreedSignals.reduce((sum, s) => sum + s.confidence, 0) / Math.max(agreedSignals.length, 1);
+    const moduleRatio = totalAgreed / 13;
+    const compositeScore = canPublish ? Math.min((avgConfidence * 0.6 + moduleRatio * 0.4) * 10, 10) : 0;
 
     const result: AnalysisResult = {
       symbol: data.symbol,
       timeframe: data.timeframe,
       timestamp: Date.now(),
       primarySignal: strongestSignal,
-      confidence: canPublish ? Math.min(strongestSignal.confidence * 10, 10) : 0,
+      confidence: compositeScore,
       modulesAgreed: signals
         .filter((s) => s.direction === strongestSignal.direction)
         .map((s) => s.moduleName),
@@ -77,16 +83,26 @@ export class AnalysisEngine {
   }
 
   private mergeKeyLevels(levels: any[]) {
-    const grouped: Record<number, any> = {};
+    if (levels.length === 0) return [];
+    const sorted = [...levels].sort((a, b) => a.price - b.price);
+    const clusters: any[][] = [[sorted[0]]];
 
-    levels.forEach((level) => {
-      const key = Math.round(level.price * 100) / 100;
-      if (!grouped[key]) {
-        grouped[key] = level;
+    for (let i = 1; i < sorted.length; i++) {
+      const last = clusters[clusters.length - 1];
+      const refPrice = last[0].price;
+      // Cluster levels within 0.5% of each other
+      if (Math.abs(sorted[i].price - refPrice) / refPrice < 0.005) {
+        last.push(sorted[i]);
+      } else {
+        clusters.push([sorted[i]]);
       }
-    });
+    }
 
-    return Object.values(grouped);
+    return clusters.map(cluster => {
+      const best = cluster.reduce((a, b) => a.strength > b.strength ? a : b);
+      const avgPrice = cluster.reduce((sum, l) => sum + l.price, 0) / cluster.length;
+      return { ...best, price: avgPrice };
+    }).sort((a, b) => b.strength - a.strength);
   }
 
   private generateRiskFlags(context: MarketContext): string[] {
