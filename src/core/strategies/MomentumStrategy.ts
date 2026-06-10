@@ -152,20 +152,33 @@ export class MomentumStrategy implements IStrategyModule {
   }
 
   private calculateMACD(bars: any[]) {
-    const ema12 = this.calculateEMA(bars, 12);
-    const ema26 = this.calculateEMA(bars, 26);
-    const macd = ema12 - ema26;
+    if (bars.length < 26) return { macd: 0, signal: 0, histogram: 0 };
 
-    // Signal = 9 EMA of MACD
-    const macdHistory = bars.map((_, idx) => {
-      const subset = bars.slice(0, idx + 1);
-      const e12 = this.calculateEMA(subset, 12);
-      const e26 = this.calculateEMA(subset, 26);
-      return e12 - e26;
-    });
+    // Incremental EMA12 and EMA26 — O(n) single pass
+    const k12 = 2 / 13, k26 = 2 / 27;
+    let ema12 = bars.slice(0, 12).reduce((s: number, b: any) => s + b.close, 0) / 12;
+    let ema26 = bars.slice(0, 26).reduce((s: number, b: any) => s + b.close, 0) / 26;
 
-    const signal = this.calculateEMA(macdHistory.map((m) => ({ close: m })), 9);
+    const macdLine: number[] = [];
+    for (let i = 12; i < 26; i++) {
+      ema12 = bars[i].close * k12 + ema12 * (1 - k12);
+    }
+    macdLine.push(ema12 - ema26);
 
+    for (let i = 26; i < bars.length; i++) {
+      ema12 = bars[i].close * k12 + ema12 * (1 - k12);
+      ema26 = bars[i].close * k26 + ema26 * (1 - k26);
+      macdLine.push(ema12 - ema26);
+    }
+
+    // Signal = 9 EMA of MACD line
+    const k9 = 2 / 10;
+    let signal = macdLine.slice(0, 9).reduce((s, v) => s + v, 0) / Math.min(9, macdLine.length);
+    for (let i = 9; i < macdLine.length; i++) {
+      signal = macdLine[i] * k9 + signal * (1 - k9);
+    }
+
+    const macd = macdLine[macdLine.length - 1];
     return { macd, signal, histogram: macd - signal };
   }
 
@@ -182,24 +195,6 @@ export class MomentumStrategy implements IStrategyModule {
       ((lastClose - lowestLow) / (highestHigh - lowestLow)) * 100 || 50;
 
     return { k, d: k }; // Simplified D = K
-  }
-
-  private calculateEMA(data: any[], period: number): number {
-    if (data.length < period) {
-      return data.reduce((sum, item) => sum + (item.close || item), 0) / data.length;
-    }
-
-    const closes = data.slice(0, period).map((item: any) => item.close ?? item);
-    const sma = closes.reduce((a: number, b: number) => a + b, 0) / period;
-    const multiplier = 2 / (period + 1);
-
-    let ema = sma;
-    for (let i = period; i < data.length; i++) {
-      const close = data[i].close ?? data[i];
-      ema = close * multiplier + ema * (1 - multiplier);
-    }
-
-    return ema;
   }
 
   private neutralSignal(): StrategySignal {
