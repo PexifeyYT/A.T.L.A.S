@@ -194,7 +194,7 @@ ipcMain.handle('run-analysis', async (_e, symbol: string, timeframe: string, ohl
   try {
     // Compute dynamic context from bar data
     const bars = ohlcvData.bars;
-    let macroTrend: 'UPTREND' | 'DOWNTREND' | 'SIDEWAYS' = 'SIDEWAYS';
+    let macroTrend: 'UPTREND' | 'DOWNTREND' | 'RANGING' = 'RANGING';
     let volatility = 0.5;
     if (bars && bars.length >= 50) {
       const recent = bars.slice(-50);
