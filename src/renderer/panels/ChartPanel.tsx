@@ -554,9 +554,10 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
 
   const stepReplay = useCallback(() => {
     setReplayIndex(prev => {
-      const next = Math.min(prev + 1, allBars.length);
-      candleSeriesRef.current?.setData(allBars.slice(0, next));
-      return next;
+      if (prev >= allBars.length) return prev;
+      // Append single bar instead of re-setting entire slice (O(1) vs O(n))
+      candleSeriesRef.current?.update(allBars[prev]);
+      return prev + 1;
     });
   }, [allBars]);
 

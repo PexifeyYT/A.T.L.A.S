@@ -92,10 +92,16 @@ export class OllamaService {
   }
 
   setAnthropicKey(key: string): void {
-    this.anthropicKey = key;
+    this.anthropicKey = key || null;
     if (key) {
       this.available = true;
       this.model = 'claude-haiku-4-5-20251001';
+    } else {
+      // Key cleared — fall back to Ollama or rule-based
+      if (!this.model || this.model.startsWith('claude')) {
+        this.available = false;
+        this.model = null;
+      }
     }
   }
 
