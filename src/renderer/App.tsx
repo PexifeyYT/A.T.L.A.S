@@ -94,7 +94,7 @@ export default function App() {
         symbol={symbol}
         onSymbolChange={sym => { setSymbol(sym); setAnalysisResult(null); }}
         timeframe={timeframe}
-        onTimeframeChange={setTimeframe}
+        onTimeframeChange={tf => { setTimeframe(tf); setAnalysisResult(null); }}
         onAnalyze={handleRunAnalysis}
         analyzing={analysisLoading}
         onScan={handleScan}
