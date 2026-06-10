@@ -128,7 +128,7 @@ const ScanRow: React.FC<{ result: ScanResult; onSelect: (sym: string) => void }>
       <div className="flex items-center justify-between text-xs text-tv-text-secondary">
         <span>
           {isLong ? '🟢' : isShort ? '🔴' : '⚪'}{' '}
-          Entry ${sig.entryZone[0].toFixed(2)}
+          Entry ${(isShort ? sig.entryZone[1] : sig.entryZone[0]).toFixed(2)}
         </span>
         <span className="text-tv-green">T1 ${sig.target1.toFixed(2)}</span>
         <span className="text-tv-red">INV ${sig.invalidation.toFixed(2)}</span>
