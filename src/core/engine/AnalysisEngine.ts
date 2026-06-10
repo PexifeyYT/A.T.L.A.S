@@ -26,21 +26,38 @@ export class AnalysisEngine {
     // Calculate confluence score
     const bullishSignals = signals.filter((s) => s.direction === 'LONG');
     const bearishSignals = signals.filter((s) => s.direction === 'SHORT');
-    const strongestSignal =
-      bullishSignals.length > bearishSignals.length
-        ? bullishSignals.sort((a, b) => b.confidence - a.confidence)[0]
-        : bearishSignals.sort((a, b) => b.confidence - a.confidence)[0];
+
+    let strongestSignal = bullishSignals.length >= bearishSignals.length
+      ? bullishSignals.sort((a, b) => b.confidence - a.confidence)[0]
+      : bearishSignals.sort((a, b) => b.confidence - a.confidence)[0];
+
+    // Fall back to neutral signal if no directional signals
+    if (!strongestSignal) {
+      const lastBar = data.bars[data.bars.length - 1];
+      const price = lastBar?.close ?? 100;
+      strongestSignal = {
+        direction: 'NEUTRAL',
+        confidence: 0,
+        entryZone: [price, price],
+        target1: price * 1.02,
+        target2: price * 1.04,
+        invalidation: price * 0.97,
+        explanation: 'No clear directional confluence across modules',
+        moduleName: 'mod_smc',
+        weight: 1.0,
+      };
+    }
 
     // Minimum 3 modules must agree
     const totalAgreed = signals.filter((s) => s.direction === strongestSignal.direction).length;
-    const canPublish = totalAgreed >= 3;
+    const canPublish = totalAgreed >= 3 && strongestSignal.direction !== 'NEUTRAL';
 
     const result: AnalysisResult = {
       symbol: data.symbol,
       timeframe: data.timeframe,
       timestamp: Date.now(),
-      primarySignal: strongestSignal || signals[0],
-      confidence: canPublish ? strongestSignal.confidence * 10 : 0,
+      primarySignal: strongestSignal,
+      confidence: canPublish ? Math.min(strongestSignal.confidence * 10, 10) : 0,
       modulesAgreed: signals
         .filter((s) => s.direction === strongestSignal.direction)
         .map((s) => s.moduleName),
