@@ -56,6 +56,9 @@ export const ChartPanel = forwardRef<ChartPanelRef, ChartPanelProps>(({
   const [replayPlaying, setReplayPlaying] = useState(false);
   const replayTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const [ohlcv, setOhlcv] = useState<{ open: number; high: number; low: number; close: number; volume?: number } | null>(null);
+  const [showPrediction, setShowPrediction] = useState(true);
+  const predictionSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const lastRealBarTimeRef = useRef<number | null>(null);
 
   // Drawing state — persisted per symbol+timeframe in localStorage
   const drawingKey = `atlas_drawings_${symbol}_${timeframe}`;
@@ -213,6 +216,19 @@ export const ChartPanel = forwardRef<ChartPanelRef, ChartPanelProps>(({
       setLoading(false);
     });
 
+    // Prediction series — semi-transparent blue candles
+    const predSeries = chart.addCandlestickSeries({
+      upColor: '#1565c0',
+      downColor: '#0d47a1',
+      borderUpColor: '#1e88e5',
+      borderDownColor: '#1565c0',
+      wickUpColor: '#1e88e5',
+      wickDownColor: '#42a5f5',
+      priceLineVisible: false,
+      lastValueVisible: false,
+    });
+    predictionSeriesRef.current = predSeries;
+
     chart.subscribeCrosshairMove(param => {
       if (param.time && candleSeries) {
         const bar = param.seriesData.get(candleSeries) as any;
@@ -222,6 +238,11 @@ export const ChartPanel = forwardRef<ChartPanelRef, ChartPanelProps>(({
       } else {
         setOhlcv(null);
       }
+    });
+
+    // Redraw overlay when panning/zooming to keep vertical prediction line aligned
+    chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+      redrawAll();
     });
 
     const handleResize = () => {
@@ -243,6 +264,8 @@ export const ChartPanel = forwardRef<ChartPanelRef, ChartPanelProps>(({
         chartRef.current.remove();
         chartRef.current = null;
         candleSeriesRef.current = null;
+        predictionSeriesRef.current = null;
+        lastRealBarTimeRef.current = null;
       }
     };
 
@@ -315,6 +338,26 @@ export const ChartPanel = forwardRef<ChartPanelRef, ChartPanelProps>(({
     }
   }, [analysisResult]);
 
+  // ─── Prediction candles ───────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!predictionSeriesRef.current) return;
+    if (analysisResult?.predictionCandles && showPrediction && analysisResult.predictionCandles.length > 0) {
+      try {
+        predictionSeriesRef.current.setData(
+          analysisResult.predictionCandles.map(c => ({
+            time: c.time as any,
+            open: c.open, high: c.high, low: c.low, close: c.close,
+          }))
+        );
+        lastRealBarTimeRef.current = analysisResult.lastRealBarTime ?? null;
+      } catch {}
+    } else {
+      try { predictionSeriesRef.current.setData([]); } catch {}
+      if (!showPrediction) lastRealBarTimeRef.current = null;
+    }
+    redrawAll();
+  }, [analysisResult, showPrediction, redrawAll]);
+
   // ─── Drawing overlay ─────────────────────────────────────────────────────────
   const resizeOverlay = useCallback(() => {
     const canvas = overlayRef.current;
@@ -334,6 +377,32 @@ export const ChartPanel = forwardRef<ChartPanelRef, ChartPanelProps>(({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw prediction boundary line
+    if (lastRealBarTimeRef.current && chartRef.current) {
+      const x = chartRef.current.timeScale().timeToCoordinate(lastRealBarTimeRef.current as any);
+      if (x !== null && x > 0 && x < canvas.width) {
+        // Shade prediction area
+        ctx.save();
+        ctx.fillStyle = 'rgba(25,118,210,0.04)';
+        ctx.fillRect(x, 0, canvas.width - x, canvas.height);
+        // Vertical dashed line
+        ctx.strokeStyle = '#1e88e5';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // Label
+        ctx.fillStyle = '#1e88e5';
+        ctx.font = 'bold 10px monospace';
+        ctx.fillText('NOW', x - 24, 14);
+        ctx.fillText('FORECAST →', x + 6, 14);
+        ctx.restore();
+      }
+    }
 
     for (const d of drawingsRef.current) {
       drawShape(ctx, d, canvas);
@@ -669,6 +738,25 @@ export const ChartPanel = forwardRef<ChartPanelRef, ChartPanelProps>(({
           onContextMenu={handleContextMenu}
         />
       </div>
+
+      {/* Prediction toggle — top right */}
+      {analysisResult?.predictionCandles && analysisResult.predictionCandles.length > 0 && (
+        <button
+          onClick={() => setShowPrediction(p => !p)}
+          className={`absolute top-2 right-2 z-20 flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-semibold border transition-colors ${
+            showPrediction
+              ? 'bg-blue-600/20 border-blue-500/60 text-blue-400 hover:bg-blue-600/30'
+              : 'bg-tv-surface/80 border-tv-border text-tv-text-secondary hover:bg-tv-surface2'
+          }`}
+          title="Toggle AI forecast overlay"
+        >
+          <svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <path d="M1 10 L4 6 L7 8 L10 3 L13 5"/>
+            <circle cx="13" cy="5" r="1.2" fill="currentColor" stroke="none"/>
+          </svg>
+          Forecast {showPrediction ? 'ON' : 'OFF'}
+        </button>
+      )}
 
       {/* TV-style OHLCV overlay — top left */}
       {!loading && (

@@ -33,12 +33,20 @@ const TIMEFRAME_MAP: Record<string, { interval: string; rangeMultiplier: number 
   '1M':  { interval: '1mo', rangeMultiplier: 1825 },
 };
 
+const TF_TTL: Record<string, number> = {
+  '1m': 15_000, '5m': 30_000, '15m': 60_000, '30m': 90_000,
+  '1H': 120_000, '2H': 180_000, '4H': 240_000,
+  '1D': 5 * 60_000, '1W': 10 * 60_000, '1M': 15 * 60_000,
+};
+
 export class MarketDataService {
   private cache = new Map<string, { data: OHLCVData; expiry: number }>();
-  private readonly TTL = 5 * 60 * 1000; // 5 min
+
+  private getTTL(timeframe: string): number {
+    return TF_TTL[timeframe] ?? 60_000;
+  }
 
   async fetchOHLCV(symbol: string, timeframe: string, limit = 200): Promise<OHLCVData> {
-    // Normalize key: requests > 500 all fetch full history, share same cache entry
     const cacheLimit = limit > 500 ? 'max' : limit;
     const key = `${symbol}_${timeframe}_${cacheLimit}`;
     const cached = this.cache.get(key);
@@ -46,12 +54,12 @@ export class MarketDataService {
 
     try {
       const data = await this.fetchFromYahoo(symbol, timeframe, limit);
-      this.cache.set(key, { data, expiry: Date.now() + this.TTL });
+      this.cache.set(key, { data, expiry: Date.now() + this.getTTL(timeframe) });
       return data;
     } catch (err) {
       console.warn(`Yahoo fetch failed for ${symbol}/${timeframe}:`, err);
       const mock = this.generateRealisticMock(symbol, timeframe, limit);
-      this.cache.set(key, { data: mock, expiry: Date.now() + this.TTL });
+      this.cache.set(key, { data: mock, expiry: Date.now() + this.getTTL(timeframe) });
       return mock;
     }
   }

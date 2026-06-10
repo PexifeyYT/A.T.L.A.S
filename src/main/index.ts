@@ -17,6 +17,15 @@ import { SeasonalityStrategy } from '../core/strategies/SeasonalityStrategy';
 import { OrderFlowStrategy } from '../core/strategies/OrderFlowStrategy';
 import { LearningEngine } from '../core/learning/LearningEngine';
 import { OutcomeChecker } from '../core/learning/OutcomeChecker';
+import { VSAStrategy } from '../core/strategies/VSAStrategy';
+import { VWAPStrategy } from '../core/strategies/VWAPStrategy';
+import { SupplyDemandZoneStrategy } from '../core/strategies/SupplyDemandZoneStrategy';
+import { DivergenceStrategy } from '../core/strategies/DivergenceStrategy';
+import { MarketProfileStrategy } from '../core/strategies/MarketProfileStrategy';
+import { MeanReversionStrategy } from '../core/strategies/MeanReversionStrategy';
+import { OpeningRangeStrategy } from '../core/strategies/OpeningRangeStrategy';
+import { DonchianBreakoutStrategy } from '../core/strategies/DonchianBreakoutStrategy';
+import { LiquidityHuntStrategy } from '../core/strategies/LiquidityHuntStrategy';
 import {
   initDatabase,
   savePrediction,
@@ -42,14 +51,20 @@ const allModuleNames = [
   'mod_smc', 'mod_tjr', 'mod_wyckoff', 'mod_elliott', 'mod_volume_profile',
   'mod_ma_systems', 'mod_momentum', 'mod_classical_ta', 'mod_volatility',
   'mod_intermarket', 'mod_sentiment', 'mod_seasonality', 'mod_orderflow',
+  'mod_vsa', 'mod_vwap', 'mod_supply_demand', 'mod_divergence',
+  'mod_market_profile', 'mod_mean_reversion', 'mod_orb', 'mod_donchian',
+  'mod_liquidity_hunt',
 ];
 
 const defaultWeights = new Map([
   ['mod_smc', 1.82], ['mod_tjr', 1.71], ['mod_wyckoff', 1.60],
-  ['mod_volume_profile', 1.54], ['mod_ma_systems', 1.31], ['mod_classical_ta', 1.31],
-  ['mod_momentum', 1.18], ['mod_volatility', 1.10], ['mod_intermarket', 0.95],
-  ['mod_sentiment', 0.85], ['mod_seasonality', 0.72], ['mod_elliott', 0.71],
-  ['mod_orderflow', 0.68],
+  ['mod_liquidity_hunt', 1.48], ['mod_supply_demand', 1.55],
+  ['mod_volume_profile', 1.54], ['mod_market_profile', 1.42],
+  ['mod_vsa', 1.45], ['mod_vwap', 1.38], ['mod_ma_systems', 1.31],
+  ['mod_classical_ta', 1.31], ['mod_divergence', 1.28], ['mod_mean_reversion', 1.22],
+  ['mod_momentum', 1.18], ['mod_orb', 1.15], ['mod_volatility', 1.10],
+  ['mod_donchian', 1.08], ['mod_intermarket', 0.95], ['mod_sentiment', 0.85],
+  ['mod_seasonality', 0.72], ['mod_elliott', 0.71], ['mod_orderflow', 0.68],
 ]);
 
 analysisEngine.registerStrategy(new SMCStrategy());
@@ -65,6 +80,15 @@ analysisEngine.registerStrategy(new IntermarketStrategy());
 analysisEngine.registerStrategy(new SentimentStrategy());
 analysisEngine.registerStrategy(new SeasonalityStrategy());
 analysisEngine.registerStrategy(new OrderFlowStrategy());
+analysisEngine.registerStrategy(new VSAStrategy());
+analysisEngine.registerStrategy(new VWAPStrategy());
+analysisEngine.registerStrategy(new SupplyDemandZoneStrategy());
+analysisEngine.registerStrategy(new DivergenceStrategy());
+analysisEngine.registerStrategy(new MarketProfileStrategy());
+analysisEngine.registerStrategy(new MeanReversionStrategy());
+analysisEngine.registerStrategy(new OpeningRangeStrategy());
+analysisEngine.registerStrategy(new DonchianBreakoutStrategy());
+analysisEngine.registerStrategy(new LiquidityHuntStrategy());
 
 const createWindow = () => {
   // isDev must be evaluated AFTER app is ready

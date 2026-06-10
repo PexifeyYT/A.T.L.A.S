@@ -150,6 +150,7 @@ export default function App() {
         />
 
         <ChartPanel
+          key={`${symbol}-${timeframe}`}
           ref={chartPanelRef}
           symbol={symbol}
           timeframe={timeframe}

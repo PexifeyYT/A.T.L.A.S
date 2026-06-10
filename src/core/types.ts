@@ -51,6 +51,14 @@ export interface MarketContext {
   newssentiment?: number;
 }
 
+export interface PredictionCandle {
+  time: number; // unix seconds
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
 // Analysis result
 export interface AnalysisResult {
   symbol: string;
@@ -65,6 +73,9 @@ export interface AnalysisResult {
   prediction: {
     scenario1: { direction: string; probability: number; target1: number; target2: number };
   };
+  predictionCandles?: PredictionCandle[];
+  lastRealBarTime?: number; // unix seconds — boundary between real and predicted
+  moduleVotes?: Record<string, { direction: string; confidence: number; agrees: boolean }>;
 }
 
 // Prediction tracking
