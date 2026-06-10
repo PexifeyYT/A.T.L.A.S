@@ -28,6 +28,7 @@ interface Drawing {
 
 export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analysisResult, activeTool: externalTool, onToolChange }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [liveQuote, setLiveQuote] = useState<{ price: number; changePercent: number } | null>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -502,6 +503,20 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
     return () => { if (replayTimer.current) clearInterval(replayTimer.current); };
   }, [replayPlaying, replayMode, stepReplay]);
 
+  // Live price polling
+  useEffect(() => {
+    let active = true;
+    const poll = async () => {
+      try {
+        const r = await window.api.fetchLiveQuote(symbol);
+        if (active && r.success && r.data) setLiveQuote({ price: r.data.price, changePercent: r.data.changePercent });
+      } catch {}
+    };
+    poll();
+    const interval = setInterval(poll, 10000);
+    return () => { active = false; clearInterval(interval); };
+  }, [symbol]);
+
   const tools: { id: DrawingTool; icon: string; label: string }[] = [
     { id: 'cursor', icon: '↖', label: 'Cursor' },
     { id: 'hline', icon: '─', label: 'H-Line' },
@@ -605,6 +620,23 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
           onMouseUp={handleMouseUp}
         />
       </div>
+
+      {/* Live price overlay */}
+      {liveQuote && !loading && (
+        <div className="absolute top-2 left-2 z-10 pointer-events-none">
+          <div className="bg-tv-surface/80 border border-tv-border/50 rounded px-2 py-1">
+            <span className="text-xs font-bold text-tv-text mr-2">{symbol}</span>
+            <span className="text-sm font-mono font-bold text-tv-text">
+              ${liveQuote.price > 1000
+                ? liveQuote.price.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                : liveQuote.price.toFixed(2)}
+            </span>
+            <span className={`text-xs ml-2 font-medium ${liveQuote.changePercent >= 0 ? 'text-tv-green' : 'text-tv-red'}`}>
+              {liveQuote.changePercent >= 0 ? '+' : ''}{liveQuote.changePercent.toFixed(2)}%
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Loading overlay */}
       {loading && (
