@@ -18,7 +18,16 @@ export class OutcomeChecker {
     const barsAfter = data.bars.filter((b) => b.time > prediction.timestamp);
 
     if (barsAfter.length === 0) {
-      return this.buildOutcome(prediction, false, false, false, false, false, 0);
+      return {
+        predictionId: prediction.id,
+        directionCorrect: false,
+        target1Hit: false,
+        target2Hit: false,
+        invalidationHit: false,
+        entryRespected: false,
+        actualReturn: 0,
+        score: 0,
+      };
     }
 
     const windowBars = barsAfter.slice(0, prediction.horizonBars);
