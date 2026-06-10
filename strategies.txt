@@ -1,0 +1,874 @@
+═══════════════════════════════════════════════════════════════════════════════
+ATLAS — ALL 22 TRADING STRATEGIES
+Complete Reference: Logic, Implementation, Confidence, Weight
+═══════════════════════════════════════════════════════════════════════════════
+
+Total strategies: 22
+Confluence threshold: minimum 3 must agree on direction to publish signal
+Score formula: (avgConfidence × 0.6 + moduleRatio × 0.4) × 10 → 0–10
+
+Weights are adaptive — learning loop adjusts ±(score/110) per prediction outcome.
+Weights clamped: [0.1, 2.0]. Starting weights listed below.
+
+───────────────────────────────────────────────────────────────────────────────
+1. SMART MONEY CONCEPTS (SMC)
+   ID: mod_smc | Weight: 1.82 | File: SMCStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   The methodology used by institutional traders — banks, hedge funds, prop desks.
+   Tracks where large capital enters and exits the market through structural patterns.
+   Highest-weighted module because it directly models institutional behavior.
+
+CORE CONCEPTS:
+
+Order Blocks:
+   - Demand OB: Last bearish candle before a bullish impulse move upward.
+     These are areas where institutions placed buy orders. When price returns,
+     they will defend the level (more buying).
+   - Supply OB: Last bullish candle before a bearish impulse move downward.
+     Institutions placed sell orders here. Return = more selling.
+   - Validity: OB is valid until price closes through it.
+   - Implementation: Scan last 50 bars, find impulse moves (> 2× ATR body),
+     identify the final opposite-direction candle before impulse.
+
+Fair Value Gaps (FVG / Imbalance):
+   - 3-bar pattern: If bar[i-2].high < bar[i].low → bullish FVG (gap up, unfilled).
+   - Bullish FVG: Zone between bar[i-2].high and bar[i].low. Price fills, bounces.
+   - Bearish FVG: bar[i-2].low > bar[i].high. Zone between those two prices.
+   - Markets are fractal — gaps get filled eventually. Entry on fill, continuation expected.
+
+Break of Structure (BOS):
+   - Higher high in established downtrend = bullish BOS. Trend may be reversing.
+   - Lower low in established uptrend = bearish BOS. Trend may be reversing.
+   - First BOS = Change of Character (CHoCH) — earliest reversal warning.
+   - Subsequent BOS confirm new direction.
+
+Entry Logic:
+   - Ideal setup: Price returns to OB that is also within an FVG.
+   - Confluence: OB + FVG alignment = highest probability entry zone.
+   - Target: Next major swing high/low on opposite side.
+   - Invalidation: Close through the OB (not just a wick).
+
+WHY HIGH WEIGHT:
+   Explains HOW institutional money moves. When you see a spike down with
+   immediate recovery, that's a liquidity grab into institutional demand.
+   SMC provides the structural framework all other methods build on.
+
+───────────────────────────────────────────────────────────────────────────────
+2. TJR PRICE ACTION
+   ID: mod_tjr | Weight: 1.71 | File: TJRStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   A proprietary price action system built on institutional candle analysis.
+   Focuses on identifying where large orders entered the market through candle
+   size, position, and subsequent price behavior.
+
+CORE CONCEPTS:
+
+Institutional Candles:
+   - Large body candle (body > 2× recent ATR) that gaps away from prior range.
+   - Represents a single large order or coordinated institutional entry.
+   - The 50% level (midpoint) of the candle body = optimal entry zone on retest.
+
+Liquidity Grabs:
+   - Wick extends beyond recent swing high/low, then closes back inside range.
+   - Classic stop hunt. Institutions need liquidity (stop orders) to fill their orders.
+   - After the grab, price moves opposite direction rapidly.
+
+Key Levels:
+   - Highs and lows of institutional candles serve as magnetic support/resistance.
+   - These levels hold because the original order placer will defend their position.
+
+Entry Strategy:
+   - Wait for retest of institutional candle midpoint (50% retracement).
+   - Enter in direction of the original impulse.
+   - Stop below the candle low (demand) or above candle high (supply).
+   - Target: next institutional candle on opposite side.
+
+───────────────────────────────────────────────────────────────────────────────
+3. WYCKOFF METHOD
+   ID: mod_wyckoff | Weight: 1.60 | File: WyckoffStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   Developed by Richard Wyckoff (1930s). Studies the relationship between price
+   movement, volume, and time to determine the actions of the "Composite Man"
+   (the collective force of large operators). One of the oldest and most proven methods.
+
+ACCUMULATION PHASES:
+   PS  — Preliminary Support: First attempt to stop decline, volume increases.
+   SC  — Selling Climax: Panic selling, highest volume, wide spread down bar, closes off lows.
+   AR  — Automatic Rally: Short covering + new buyers, prices bounce.
+   ST  — Secondary Test: Price returns to SC area on lower volume. Key test.
+   Spring — False breakdown below support. Traps shorts. Volume spike. Close above support.
+   SOS — Sign of Strength: Strong rally on high volume after Spring.
+   LPS — Last Point of Support: Small pullback on low volume after SOS. Best entry.
+   BU  — Back Up: Return to broken resistance (now support). Confirms accumulation.
+
+DISTRIBUTION PHASES:
+   PSY — Preliminary Supply: First selling pressure after uptrend.
+   BC  — Buying Climax: Euphoric buying, highest volume, wide up bar.
+   AR  — Automatic Reaction: Sharp sell-off as longs liquidate.
+   ST  — Secondary Test: Rally back to BC area on lower volume.
+   UTAD — Upthrust After Distribution: False breakout above resistance. Traps longs.
+   LPSY — Last Point of Supply: Weak rally on low volume. Best short entry.
+   SOW — Sign of Weakness: Breakdown on high volume.
+
+EFFORT VS RESULT:
+   High volume + small price move = absorption (opposing force is strong).
+   High volume + large price move = genuine trend (go with it).
+   Low volume + large price move = easy movement (trend has no opposition, go with it but exit fast).
+   Low volume + small price move = weakness drying up (anticipate directional move).
+
+WHY IT WORKS:
+   All markets go through accumulation and distribution. The Composite Man
+   (large money) must accumulate before they can mark up. Must distribute
+   before they can mark down. The sequence is logical and repeating.
+
+───────────────────────────────────────────────────────────────────────────────
+4. SUPPLY AND DEMAND ZONES
+   ID: mod_supply_demand | Weight: 1.55 | File: SupplyDemandZoneStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   Zone-based support/resistance methodology. Finds areas where an imbalance between
+   buyers and sellers previously caused a rapid price move, indicating unfilled orders remain.
+
+ZONE DETECTION:
+   Base bar: Tight consolidation bar (range < 1.2× ATR). Price going sideways = orders accumulating.
+   Explosive move: Next 1-2 bars move > 2× ATR from the base. Orders triggered.
+
+   Demand Zone (long): Base bar followed by explosive UP move.
+   Supply Zone (short): Base bar followed by explosive DOWN move.
+
+   Zone boundaries: High and low of the base bar(s).
+
+FRESHNESS SCORING:
+   Fresh zone (0 retests): Confidence 0.76. All unfilled orders still present.
+   1 retest:               Confidence 0.62. Some orders filled, zone weakened.
+   2+ retests:             Confidence 0.45. Zone likely exhausted. Avoid.
+
+   Logic: Every time price enters the zone, some orders get filled.
+   A zone visited 3+ times has very few orders left. It will break.
+
+RETEST DETECTION:
+   Bar low < zone high AND bar high > zone low = bar overlaps zone = retest counted.
+
+ENTRY TIMING:
+   Price entering demand zone for 1st time = highest probability long.
+   Price entering supply zone for 1st time = highest probability short.
+   Set stop beyond zone boundary + small buffer.
+   Target: Next supply/demand zone on opposite side.
+
+───────────────────────────────────────────────────────────────────────────────
+5. VOLUME PROFILE
+   ID: mod_volume_profile | Weight: 1.54 | File: VolumeProfileStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   Distributes traded volume across price levels rather than time.
+   Shows WHERE the market actually traded, not just when.
+
+KEY LEVELS:
+   POC (Point of Control): Price level with highest volume. Strongest magnet.
+   Value Area High (VAH): Upper boundary of 70% volume zone.
+   Value Area Low (VAL): Lower boundary of 70% volume zone.
+
+High Volume Nodes (HVN): Areas of heavy trading = strong S/R (price spends time here).
+Low Volume Nodes (LVN): Areas of light trading = air pockets (price moves fast through).
+
+TRADING RULES:
+   Price at VAL = buyers defend value → LONG bias.
+   Price at VAH = sellers defend upper value → SHORT bias.
+   Price breaking VAH with volume = expanding value area = trend.
+   Price returning to POC after breakout = retest of strongest level.
+   LVN below price = easy run down if broken. LVN above = easy run up.
+
+IMPLEMENTATION:
+   50-bucket histogram over 100-200 bars. Each bucket = price range.
+   Volume accumulated per bucket. POC = max bucket. Value area = 70% of total volume.
+
+───────────────────────────────────────────────────────────────────────────────
+6. LIQUIDITY HUNT
+   ID: mod_liquidity_hunt | Weight: 1.48 | File: LiquidityHuntStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   Markets move to where stop orders cluster. Retail traders place stops at obvious
+   levels (swing highs/lows, round numbers, equal highs/lows). Institutions sweep
+   these levels to get filled, then reverse direction.
+
+PATTERN: BULLISH LIQUIDITY SWEEP
+   1. Identify swing low with 2-bar confirmation each side.
+   2. Price wicks below swing low (bar.low < swingLow × 0.998).
+   3. Price closes above swing low (bar.close > swingLow).
+   4. = Stop orders triggered below swing low. Sellers trapped. Buyers filled.
+   5. Entry: Close of sweep candle. Target: Prior swing high.
+   Confidence scales with wick size relative to ATR.
+
+PATTERN: BEARISH LIQUIDITY SWEEP
+   1. Identify swing high.
+   2. Wick above swing high, close below.
+   3. = Stop orders triggered above swing high. Buyers trapped. Sellers filled.
+   4. Entry: Close of sweep candle. Target: Prior swing low.
+
+EQUAL HIGHS / EQUAL LOWS:
+   Two or more swing highs within 0.2% of each other = equal highs.
+   Retail traders place buy stops above both highs. Obvious target for institutions.
+   Equal highs swept then close below = strong SHORT signal.
+   Equal lows swept then close above = strong LONG signal.
+
+SESSION EXTREMES:
+   Prior session high/low often swept at open. Same logic applies.
+   Price takes out yesterday's high then reverses = stop hunt complete.
+
+WHY IT WORKS:
+   Institutions need liquidity (opposing orders) to fill their large positions.
+   Stop orders = limit orders for the opposing side. Perfect fill for large orders.
+
+───────────────────────────────────────────────────────────────────────────────
+7. VOLUME SPREAD ANALYSIS (VSA)
+   ID: mod_vsa | Weight: 1.45 | File: VSAStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   Tom Williams / Richard Wyckoff methodology. Analyzes the relationship between
+   spread (price range), close position, and volume to read smart money's actions.
+   Volume shows HOW MUCH effort. Spread shows the RESULT of that effort.
+
+SIGNALS:
+
+Selling Climax (BULLISH reversal):
+   Wide spread + ultra-high volume (> 3× avg) + close in LOWER half of bar.
+   = Smart money absorbing panic selling from retail. Supply exhausted. Bull signal.
+
+Stopping Volume (BULLISH reversal):
+   Wide down bar + ultra-high volume + close ABOVE midpoint.
+   = Buyers stepping in to absorb selling. Down move losing energy. Bull signal.
+
+Buying Climax (BEARISH):
+   Wide spread + ultra-high volume + close in UPPER half of bar.
+   = Smart money distributing into euphoric retail buying. Demand exhausted.
+
+No Demand (BEARISH continuation):
+   Narrow spread + low volume (< 0.7× avg) + up close.
+   = No institutional buying behind rally. Move is weak. Expect failure.
+
+No Supply (BULLISH continuation):
+   Narrow spread + low volume + down close.
+   = No selling pressure behind decline. Move is weak. Expect reversal.
+
+Effort vs Result Mismatch:
+   High volume + tiny price move = absorption (trapped side is losing).
+   Low volume + sustained directional move = easy movement (no opposition).
+
+VOLUME THRESHOLDS:
+   Low: < avgVol × 0.7
+   High: > avgVol × 2.0
+   Ultra-high: > avgVol × 3.0
+   avgVol calculated from last 20 bars.
+
+───────────────────────────────────────────────────────────────────────────────
+8. MARKET PROFILE
+   ID: mod_market_profile | Weight: 1.42 | File: MarketProfileStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   J. Peter Steidlmayer (CME, 1980s). Organizes market activity by price and time
+   rather than just time. Shows accepted value (where most trading occurs) vs
+   rejected price (extremes that will be revisited).
+
+CONCEPTS:
+
+Point of Control (POC):
+   Price level with maximum volume over session/lookback period.
+   Strongest reference level. Price gravitates back to POC.
+
+Value Area (70% Rule):
+   Range containing 70% of total session volume.
+   VAH (top of value area) = where sellers found acceptance.
+   VAL (bottom) = where buyers found acceptance.
+
+Poor Highs / Poor Lows:
+   Two or more consecutive bars at the same high = auction was stopped artificially.
+   = Unfinished business. Market will return to this extreme.
+   Same logic for consecutive equal lows.
+
+TRADING LOGIC:
+   Below VAL: LONG — price is below accepted value. Will revert to value.
+   Above VAH: SHORT — price is above accepted value. Will revert.
+   At POC: Both sides compete. Wait for break with volume.
+   Poor High + at VAH: Strong SHORT setup (rejection + unfinished business above).
+   Poor Low + at VAL: Strong LONG setup.
+
+IMPLEMENTATION:
+   50-bucket price histogram over last 100 bars.
+   Accumulate volume per bucket. POC = max. Expand from POC ± until 70% volume captured.
+
+───────────────────────────────────────────────────────────────────────────────
+9. VWAP & ANCHORED VWAP
+   ID: mod_vwap | Weight: 1.38 | File: VWAPStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   Volume-Weighted Average Price. The institutional benchmark. Algorithms, index funds,
+   and large players use VWAP as execution benchmark. Price relationship to VWAP
+   tells you who is in control — buyers or sellers.
+
+CALCULATION:
+   TP = (high + low + close) / 3  (typical price)
+   VWAP = Σ(TP × volume) / Σ(volume)  (running cumulative)
+   σ = standard deviation of (TP - VWAP) weighted by volume
+   Bands: VWAP ± 1σ, ± 2σ
+
+SIGNALS:
+
+VWAP Reclaim (BULLISH):
+   Price was below VWAP, now closes above = buyers taking control.
+   Confidence: 0.65. Entry on reclaim close. Stop: back below VWAP.
+
+VWAP Rejection (BEARISH):
+   Price was above VWAP, now closes below = sellers taking control.
+   Confidence: 0.65. Entry on rejection close.
+
++2σ (Upper Band) — SHORT:
+   Price reached extreme. Statistically expensive relative to volume-weighted average.
+   Mean reversion expected. Confidence: 0.68. Stop: close above +2σ.
+
+-2σ (Lower Band) — LONG:
+   Price reached extreme cheap. Mean reversion expected.
+   Confidence: 0.68. Stop: close below -2σ.
+
+VWAP Pullback (BULLISH continuation):
+   Price above VWAP, pulls back to VWAP from above = buy the dip at institutional benchmark.
+   Confidence: 0.65. Common professional entry technique.
+
+ANCHORED VWAP:
+   VWAP anchored from significant swing point (major high/low, earnings date, etc.)
+   Acts as S/R level that accounts for volume at each price since anchor.
+
+───────────────────────────────────────────────────────────────────────────────
+10. MOVING AVERAGE SYSTEMS
+    ID: mod_ma_systems | Weight: 1.31 | File: MASystemStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   EMA-based trend identification and dynamic support/resistance. Exponential MAs
+   are preferred over simple MAs because they weight recent price more heavily,
+   making them more responsive to current conditions.
+
+KEY LEVELS:
+   EMA 9:  Short-term momentum (used by day traders, swing traders)
+   EMA 21: Short-medium trend
+   EMA 50: Medium-term trend reference (institutional interest)
+   EMA 200: Primary bull/bear dividing line (most watched level in any market)
+
+SIGNALS:
+
+Golden Cross: EMA 50 crosses above EMA 200 → long-term bullish.
+Death Cross:  EMA 50 crosses below EMA 200 → long-term bearish.
+
+EMA Stack (Bullish): 9 > 21 > 50 > 200. All aligned upward. Strong uptrend.
+EMA Stack (Bearish): 9 < 21 < 50 < 200. All aligned downward. Strong downtrend.
+
+EMA Convergence: EMAs bunching together = trend losing steam, potential reversal.
+EMA Divergence: EMAs spreading apart = trend accelerating, stay in trade.
+
+Price below EMA 200 = bearish bias. Sell rallies. Avoid longs.
+Price above EMA 200 = bullish bias. Buy dips. Avoid shorts.
+
+EMA 50 as pullback level: In trending market, pull back to EMA 50 = continuation entry.
+
+───────────────────────────────────────────────────────────────────────────────
+11. CLASSICAL TECHNICAL ANALYSIS PATTERNS
+    ID: mod_classical_ta | Weight: 1.31 | File: ClassicalPatternsStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   Traditional chart pattern recognition. These patterns work because they represent
+   recurring human psychology — greed, fear, hope — that creates predictable price structures.
+
+REVERSAL PATTERNS:
+
+Head & Shoulders (BEARISH reversal):
+   Three peaks. Left shoulder + higher head + right shoulder (lower than head).
+   Neckline: drawn through the two troughs. Break below neckline = entry.
+   Target: Head height projected down from neckline.
+   Most reliable reversal pattern in technical analysis.
+
+Inverse H&S (BULLISH reversal): Mirror image. Break above neckline = entry.
+
+Double Top (BEARISH):
+   Two equal highs within 1-3%. Neckline = trough between them.
+   Break below neckline with volume = confirmed. Target = pattern height down.
+
+Double Bottom (BULLISH): Two equal lows. Break above neckline.
+
+Triple Top / Bottom: Like double but with three tests. Even stronger confirmation.
+
+CONTINUATION PATTERNS:
+
+Bull Flag: Sharp rally (flagpole) → parallel channel pullback → breakout upward.
+Bear Flag: Sharp decline → parallel channel rally → breakout downward.
+Pennant: Sharp move → symmetrical triangle consolidation → continuation.
+
+Ascending Triangle: Flat top + rising lows. Buyers more aggressive each time. Bullish breakout.
+Descending Triangle: Flat bottom + falling highs. Sellers. Bearish breakdown.
+Symmetrical Triangle: Converging lines. Neutral until breakout direction determined.
+
+Rising Wedge: Both lines rising but converging. Bearish (rally losing steam).
+Falling Wedge: Both lines falling, converging. Bullish (decline losing momentum).
+
+Cup & Handle:
+   Rounded bottom (cup) + small consolidation (handle) + breakout = bullish.
+   Most reliable continuation pattern in stocks.
+
+MEASURED MOVES:
+   All patterns have measured move targets = pattern height projected from breakout.
+   Example: Double top pattern is 5% tall → target is 5% below neckline.
+
+───────────────────────────────────────────────────────────────────────────────
+12. DIVERGENCE ANALYSIS
+    ID: mod_divergence | Weight: 1.28 | File: DivergenceStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   Compares price swing highs/lows to oscillator (RSI) swing highs/lows.
+   When they disagree, momentum is weakening → reversal or continuation signal.
+   One of the highest-accuracy signals in technical analysis when used with confluence.
+
+INDICATOR: RSI 14-period.
+
+REGULAR DIVERGENCE (reversal signals):
+
+Regular Bullish Divergence:
+   Price makes LOWER LOW. RSI makes HIGHER LOW.
+   = Price falling but momentum strengthening. Sellers losing steam. BUY signal.
+   Only valid when RSI < 45 (actually in oversold territory).
+   Confidence: 0.68.
+
+Regular Bearish Divergence:
+   Price makes HIGHER HIGH. RSI makes LOWER HIGH.
+   = Price rising but momentum weakening. Buyers losing steam. SELL signal.
+   Only valid when RSI > 55 (actually in overbought territory).
+   Confidence: 0.68.
+
+HIDDEN DIVERGENCE (continuation signals):
+
+Hidden Bullish Divergence:
+   Price makes HIGHER LOW (uptrend). RSI makes LOWER LOW.
+   = Trend is intact but RSI pulled back more. Buyers still in control. BUY continuation.
+   Confidence: 0.62.
+
+Hidden Bearish Divergence:
+   Price makes LOWER HIGH (downtrend). RSI makes HIGHER HIGH.
+   = Trend intact but RSI rallied more. Sellers in control. SELL continuation.
+   Confidence: 0.62.
+
+IMPLEMENTATION:
+   Calculate full RSI array. Find swing highs/lows in price and RSI using
+   10-bar lookback window (findMaxIdx / findMinIdx helpers).
+   Compare last two swings. If they diverge = signal.
+
+───────────────────────────────────────────────────────────────────────────────
+13. MEAN REVERSION
+    ID: mod_mean_reversion | Weight: 1.22 | File: MeanReversionStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   Markets oscillate around a mean. When price moves statistically too far from
+   average, probability favors return. Best used in ranging/low-volatility markets.
+
+INDICATORS:
+   Z-score = (current price - 20-bar SMA) / 20-bar standard deviation
+   Bollinger Bands = SMA ± 2σ
+   ADX = Average Directional Index (14-period). Measures trend strength.
+
+REGIME FILTER (critical):
+   ADX < 25 = ranging market → mean reversion valid. TRADE IT.
+   ADX > 25 = trending market → mean reversion fails. DO NOT TRADE.
+   This filter is what separates profitable mean reversion from disaster.
+
+SIGNALS:
+   Z < -2.0 AND ADX < 25 = LONG. Price statistically cheap. Revert to mean.
+   Z > +2.0 AND ADX < 25 = SHORT. Price statistically expensive.
+
+   Confidence = min(|z-score| / 3, 0.85) × ADX discount factor.
+   Z-score of -3.0 = max confidence (extreme oversold). Z-score of -2.0 = lower conf.
+
+TARGETS:
+   Long target: SMA (mean). Maybe SMA + 0.5σ if strong move.
+   Short target: SMA.
+   Stop: 3σ from mean (price becomes MORE extreme before reverting = stop out).
+
+BOLLINGER BANDS:
+   Upper band (SMA + 2σ): SHORT entry zone.
+   Lower band (SMA - 2σ): LONG entry zone.
+   Band width: Narrow = low volatility squeeze. Expansion imminent.
+   Band walk: Price hugging upper/lower band = trend, not mean reversion environment.
+
+───────────────────────────────────────────────────────────────────────────────
+14. MOMENTUM STRATEGY
+    ID: mod_momentum | Weight: 1.18 | File: MomentumStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   Trend-following using oscillator signals and rate of change.
+   Momentum strategies work because trends persist — winners keep winning,
+   losers keep losing (momentum factor in academic finance).
+
+INDICATORS:
+   RSI 14: Relative Strength Index. > 60 = bullish momentum. < 40 = bearish.
+   MACD: 12-26 EMA difference + 9 EMA signal line. Crossovers = momentum shifts.
+   ROC: Rate of Change. Measures acceleration of price movement.
+   Stochastic %K/%D: Fast oscillator for shorter-term momentum.
+
+SIGNALS:
+   RSI > 60 + MACD bullish crossover + ROC positive = strong LONG momentum.
+   RSI < 40 + MACD bearish crossover + ROC negative = strong SHORT momentum.
+
+   Momentum divergence from price (via RSI/MACD) = potential reversal (see Divergence module).
+
+MOMENTUM ANOMALY:
+   Academic evidence: stocks/assets that performed best in past 3-12 months
+   continue to outperform next 3-12 months. This is the momentum factor.
+   Underlying cause: underreaction to information. Markets update slowly.
+
+───────────────────────────────────────────────────────────────────────────────
+15. OPENING RANGE BREAKOUT (ORB)
+    ID: mod_orb | Weight: 1.15 | File: OpeningRangeStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   The opening range (first N bars of a session) often sets the tone for the day.
+   Breakouts from this range have high follow-through probability because large
+   institutional orders often execute at open and establish direction.
+
+OPENING RANGE CALCULATION:
+   1m TF:  First 30 bars (30-minute range)
+   5m TF:  First 6 bars (30-minute range)
+   15m TF: First 4 bars (60-minute range)
+   30m TF: First 3 bars (90-minute range)
+   1H TF:  First 2 bars (first 2 hours)
+   Higher: Not meaningful (range = first bar)
+
+   ORH = highest high in opening range
+   ORL = lowest low in opening range
+
+VALIDITY FILTER:
+   Range must be 0.3% to 3% of price. Too tight = fake. Too wide = already moved.
+   Risk:reward must be minimum 1.8:1.
+
+ORB LONG: Close above ORH + volume > 1.2× average.
+   Entry: Close of breakout bar OR retest of ORH from above.
+   Target: ORH + (ORH - ORL) × 1.5 (measured move).
+   Stop: ORL.
+
+ORB SHORT: Close below ORL + volume confirmation.
+   Target: ORL - (ORH - ORL) × 1.5.
+   Stop: ORH.
+
+FAILED ORB (FADE):
+   Price breaks out → fades back inside range within 1-3 bars.
+   = Breakout was a stop hunt. Reverse the breakout.
+   High-probability reversal if volume was low on breakout.
+
+───────────────────────────────────────────────────────────────────────────────
+16. VOLATILITY STRATEGY
+    ID: mod_volatility | Weight: 1.10 | File: VolatilityStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   Identifies volatility regimes and trades the expansion/contraction cycle.
+   Low volatility always precedes high volatility. The squeeze is the setup.
+
+INDICATORS:
+   ATR (Average True Range): Measures current volatility in price terms.
+   Bollinger Bandwidth: (Upper - Lower) / SMA. Measures band width relative to price.
+   ATR percentile: Current ATR vs 252-period range.
+
+SIGNALS:
+
+Volatility Squeeze + Breakout:
+   Bollinger Bands narrow to multi-week lows (bandwidth < 20th percentile).
+   = Energy coiling. Breakout imminent. Prepare for directional trade.
+   When bands expand = enter in direction of expansion.
+
+High ATR = Wide Stops:
+   Context signal. When ATR is elevated, all strategies should widen stops 1.5×.
+   Risk flags generated in AnalysisEngine when volatility > 0.7.
+
+Low ATR = Size Down:
+   Volatility squeeze could break either direction. Reduce position size.
+   Risk flag when volatility < 0.1.
+
+Band Touch Entries:
+   In ranging market: price touches lower band = LONG. Touches upper band = SHORT.
+   Must confirm with volume and other signals — band touches alone fail in trends.
+
+───────────────────────────────────────────────────────────────────────────────
+17. DONCHIAN CHANNEL BREAKOUT (TURTLE TRADING)
+    ID: mod_donchian | Weight: 1.08 | File: DonchianBreakoutStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   The Turtle Trading System, designed by Richard Dennis and William Eckhardt (1983).
+   Two mechanical breakout systems. Among the most tested trading systems in history.
+   Proven profitable over decades across markets.
+
+SYSTEM 1 (Fast System):
+   Entry: Price closes above 20-bar highest high → LONG.
+          Price closes below 20-bar lowest low → SHORT.
+   Exit: Price closes below 10-bar lowest low (for longs).
+         Price closes above 10-bar highest high (for shorts).
+   Stop: 2× ATR from entry.
+   Confidence: 0.62.
+
+SYSTEM 2 (Slow System — more reliable):
+   Entry: Price closes above 55-bar highest high → LONG.
+          Price closes below 55-bar lowest low → SHORT.
+   Exit: Price closes below 20-bar lowest low (for longs).
+   Stop: 2× ATR from entry.
+   Confidence: 0.72.
+
+CHANNEL COMPRESSION (Squeeze Detection):
+   Current channel range (high - low) < 55% of 200-bar average range.
+   = Market contracting. Breakout is coming. Higher confidence on next signal.
+
+WHY IT WORKS:
+   Trends are real and persistent. If price makes a new 55-bar high, something
+   fundamental has changed. Major trends (commodity supercycles, equity bull markets,
+   currency trends) are caught by this system. Misses all the noise.
+
+───────────────────────────────────────────────────────────────────────────────
+18. INTERMARKET ANALYSIS
+    ID: mod_intermarket | Weight: 0.95 | File: IntermarketStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   John Murphy methodology. Studies correlations between asset classes to confirm
+   or deny signals from price action on the primary instrument.
+
+KEY RELATIONSHIPS:
+   DXY (Dollar) ↑ → Commodities (gold, oil) ↓ (inverse correlation).
+   DXY ↑ → Emerging market equities ↓ (USD debt burden).
+   Bonds ↑ (yields ↓) → Equities ↑ (risk-on, lower discount rate).
+   Gold ↑ → Risk-off environment. Watch equity sell-offs.
+   Oil ↑ → Energy stocks ↑, consumer spending pressure ↑.
+   VIX ↑ → Equities ↓ (fear rising).
+
+IMPLEMENTATION NOTE:
+   True intermarket analysis requires live data for multiple instruments simultaneously.
+   Current implementation uses price action proxies from the primary symbol's bar data
+   to estimate correlational signals. Lower weight reflects this limitation.
+
+WHEN USEFUL:
+   Confirming a LONG equity signal when bonds are rising = solid confluence.
+   Fading a LONG equity signal when dollar is surging = caution flag.
+   Best used as contextual filter, not primary signal generator.
+
+───────────────────────────────────────────────────────────────────────────────
+19. SENTIMENT ANALYSIS
+    ID: mod_sentiment | Weight: 0.85 | File: SentimentStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   Contrarian and trend-following sentiment signals. Extreme sentiment = reversal.
+   Consensus sentiment = trend continuation. "Be fearful when others are greedy."
+
+PROXY SIGNALS (from OHLCV only, no external sentiment feeds):
+   Volume surge on gap down = fear (retail panic selling) → contrarian LONG.
+   Sharp decline + extremely high volume = selling climax → contrarian LONG.
+   Narrow range + declining volume on downtrend = bearish sentiment exhausting.
+
+SENTIMENT EXTREMES:
+   Markets top when everyone is bullish (no more buyers to add).
+   Markets bottom when everyone is bearish (no more sellers to add).
+
+IMPLEMENTATION NOTE:
+   Without access to actual sentiment data (put/call ratio, social media sentiment,
+   fund flows, options skew), this module uses price/volume proxies. Lower weight
+   reflects the limitation. Would benefit from actual sentiment data integration.
+
+IDEAL DATA SOURCES (future integration):
+   Put/call ratio (CBOE), VIX level, AAII sentiment survey, fund flows,
+   short interest, options skew, social media sentiment (Twitter/Reddit).
+
+───────────────────────────────────────────────────────────────────────────────
+20. SEASONALITY
+    ID: mod_seasonality | Weight: 0.72 | File: SeasonalityStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   Statistical patterns that repeat by calendar date. Not predictive on their own
+   but add probability edge when aligned with other signals.
+
+KNOWN PATTERNS:
+   January Effect: Small caps outperform in January (tax-loss selling reversal from Dec).
+   Sell in May: "Sell in May and go away." May-Oct historically weaker.
+   Santa Rally: Late December historically bullish (holiday optimism, low volume).
+   September Effect: Historically weakest month for S&P 500.
+   October Low: Many market bottoms occur in October (fear peaks then reverses).
+
+   Day-of-Week: Monday often weak (weekend risk unwinding). Friday afternoon often bullish.
+
+   Commodity Seasonality: Gold strong Sep-Nov (Indian wedding season, jewelry demand).
+                          Oil demand peaks summer (driving) and winter (heating).
+
+ROLE IN ATLAS:
+   Lowest-weight directional module. Provides a tailwind/headwind bias only.
+   If analysis points LONG and it's Santa Rally season = slight confidence boost.
+   Does not generate standalone signals. Context only.
+
+───────────────────────────────────────────────────────────────────────────────
+21. ELLIOTT WAVE THEORY
+    ID: mod_elliott | Weight: 0.71 | File: ElliottWaveStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   Ralph Nelson Elliott (1930s). Markets move in predictable wave patterns driven by
+   collective investor psychology. 5-wave impulse + 3-wave correction, repeating fractally.
+
+IMPULSE WAVES (1-2-3-4-5):
+   Wave 1: Initial move. Often small, unrecognized.
+   Wave 2: Retracement of wave 1. Never exceeds start of wave 1. Often 61.8% retrace.
+   Wave 3: Largest, strongest wave. Never shortest. Often 161.8% of wave 1. Most profitable.
+   Wave 4: Consolidation. Never enters wave 1 territory. Often 38.2% retrace of wave 3.
+   Wave 5: Final push. Often equals wave 1 in size. Divergence common.
+
+CORRECTIVE WAVES (A-B-C):
+   Wave A: First leg down.
+   Wave B: Rally. Can be sharp. Often confuses people into thinking trend resumed.
+   Wave C: Final decline. Often equals wave A. Usually sharp and brutal.
+
+FIBONACCI RATIOS:
+   Wave 2 = 61.8% of wave 1
+   Wave 3 = 161.8% of wave 1 (target)
+   Wave 4 = 38.2% of wave 3
+   Wave 5 = 61.8%–100% of wave 1
+
+IMPLEMENTATION NOTE:
+   Automated wave counting is notoriously difficult. Wave counts are subjective —
+   different analysts count differently. The 0.71 weight reflects this. Used as
+   target projection tool more than entry signal. Fibonacci ratios are reliable;
+   wave count labeling is not.
+
+───────────────────────────────────────────────────────────────────────────────
+22. ORDER FLOW ANALYSIS
+    ID: mod_orderflow | Weight: 0.68 | File: OrderFlowStrategy.ts
+───────────────────────────────────────────────────────────────────────────────
+
+WHAT IT IS:
+   Level 2 / tape reading / footprint chart analysis. Studies the actual flow of
+   buy and sell orders at each price level. The most granular view of who is
+   winning the battle between buyers and sellers.
+
+TRUE ORDER FLOW (requires tick data):
+   Bid/ask volume at each price tick.
+   Delta = Ask volume - Bid volume. Positive = buyers aggressive. Negative = sellers.
+   Imbalances: More buy volume than sell at a level = buyers absorbing sellers.
+   Absorption: Large sell orders absorbed by buyers without price falling = bullish.
+   Exhaustion: Price makes new high but delta turns negative = buyers running out.
+
+OHLCV PROXY IMPLEMENTATION:
+   Since tick data is unavailable, delta is estimated:
+   If bar close > bar open = buying pressure dominant.
+   If bar close < bar open = selling pressure dominant.
+   Volume-weighted delta over recent bars.
+   Absorption proxy: high volume + small spread.
+
+   Accuracy is limited without real tick data. Hence lowest weight (0.68).
+
+WHEN MOST ACCURATE:
+   Near key levels (S/R, OBs, zones). Absorption at support = strong LONG signal.
+   On breakouts: high volume + expanding spread = genuine break.
+                 high volume + failing to advance = fake break.
+
+FUTURE IMPROVEMENT:
+   Integrate with broker API for real order book data. Or use tick data provider.
+   With real footprint data, this module would be among highest-weighted.
+
+═══════════════════════════════════════════════════════════════════════════════
+PREDICTION GENERATION METHODOLOGY
+═══════════════════════════════════════════════════════════════════════════════
+
+After analysis completes, 40 future bars are generated:
+
+1. ATR from last 14 bars = measure of recent volatility.
+2. Direction bias from consensus (LONG=+1, SHORT=-1, NEUTRAL=0).
+3. Trend component per bar: price × trendPct × decayFactor
+   - trendPct = (compositeScore / 10) × 0.015 × bias  (max 1.5%/bar at score=10)
+   - decayFactor = e^(-i × 0.04)  — trend fades over 40 bars (uncertainty grows)
+4. Noise component: ATR × (0.7 + i × 0.02) × seededRandom
+   - Noise increases with horizon. Bar 1 = 70% ATR noise. Bar 40 = 150% ATR noise.
+   - Seeded LCG ensures same analysis produces same prediction shape.
+5. Candle generated: open=prev_close, move=trend+noise, wick=ATR×random(0.15-0.50)
+
+Visual rendering:
+   - Blue color scheme: up #1565c0, down #0d47a1, wick #42a5f5
+   - Dashed vertical line at boundary: "NOW" left, "FORECAST →" right
+   - Blue semi-transparent shade on forecast half of chart
+   - Forecast ON/OFF toggle button (top-right of chart, z-20)
+
+═══════════════════════════════════════════════════════════════════════════════
+CONFLUENCE SCORING
+═══════════════════════════════════════════════════════════════════════════════
+
+1. All 22 modules run in parallel.
+2. Signals grouped: bullish vs bearish.
+3. Winning direction = more signals OR higher weighted confidence sum on tie.
+   weightedSum = Σ(confidence × weight) for each signal.
+4. Minimum 3 modules must agree AND direction ≠ NEUTRAL → canPublish = true.
+5. compositeScore = (avgConfidence × 0.6 + (agreedCount/22) × 0.4) × 10
+   Example: 15 modules agree, avgConfidence = 0.72
+   = (0.72 × 0.6 + (15/22) × 0.4) × 10
+   = (0.432 + 0.273) × 10 = 7.05/10
+6. Score = 0 when canPublish = false (less than 3 agree or NEUTRAL wins).
+
+═══════════════════════════════════════════════════════════════════════════════
+ADAPTIVE LEARNING
+═══════════════════════════════════════════════════════════════════════════════
+
+Every prediction saved to SQLite. Every 30 minutes, OutcomeChecker evaluates:
+
+Scoring:
+   +5 direction correct
+   +3 target 1 hit
+   +3 target 2 hit
+   +1 entry zone respected
+   -3 invalidation hit (stopped out)
+   -3 direction wrong (cancels all positive scoring)
+   Range: -3 to +11
+
+Weight adjustment per agreeing module:
+   reward = score / 110
+   newWeight = clamp(currentWeight + reward, 0.1, 2.0)
+
+A module that calls LONG and price goes straight to T2 gets +11/110 = +0.10 reward.
+A module that calls LONG and gets stopped out immediately gets -3/110 = -0.027 penalty.
+Over time, accurate modules drift toward 2.0, weak modules drift toward 0.1.
+
+═══════════════════════════════════════════════════════════════════════════════
+STRATEGY SELECTION PHILOSOPHY
+═══════════════════════════════════════════════════════════════════════════════
+
+Highest weighted (1.5+): Institutional methods that directly track smart money behavior.
+   SMC, TJR, Wyckoff, Supply/Demand, Liquidity Hunt.
+   These work because they identify WHERE institutions placed orders.
+
+Mid-tier (1.0-1.5): Proven technical methods with strong academic/empirical backing.
+   VSA, Market Profile, VWAP, MAs, Classical Patterns, Divergence, Mean Reversion, Momentum.
+   These work because they measure real price/volume dynamics.
+
+Support tier (0.7-1.0): Context and confirmation, not primary signals.
+   ORB, Volatility, Donchian — mechanical systems with edge but not always active.
+   Intermarket, Sentiment, Seasonality — macro context and probability bias.
+
+Lower weight (< 0.75): Useful but approximate, noisy, or data-limited.
+   Elliott Wave (subjective), Order Flow (requires tick data for accuracy).
+
+The weighting philosophy: All 22 modules should vote, but institutional methods
+should count more. Consensus of weaker methods still matters. A 15-7 vote with
+strong weighted sum = high confidence. A 12-10 vote with weak weighted sum = low confidence.
