@@ -169,7 +169,7 @@ async function runLearningLoop() {
         learningEngine.updateWeight(moduleName, outcome);
       }
 
-      const stats = getStats();
+      const stats = getStats(prediction.symbol);
       upsertAssetProfile(prediction.symbol, {
         accuracy: stats.accuracy,
         totalPredictions: stats.total,

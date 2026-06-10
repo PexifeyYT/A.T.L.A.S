@@ -173,7 +173,14 @@ export function upsertAssetProfile(symbol: string, data: any): void {
   }
 }
 
-export function getStats(): any {
+export function getStats(symbol?: string): any {
+  if (symbol) {
+    const total = (db.prepare('SELECT COUNT(*) as count FROM predictions WHERE symbol = ?').get(symbol) as any)?.count || 0;
+    const outcomes = (db.prepare('SELECT COUNT(*) as count FROM outcomes o JOIN predictions p ON o.prediction_id = p.id WHERE p.symbol = ?').get(symbol) as any)?.count || 0;
+    const wins = (db.prepare('SELECT COUNT(*) as count FROM outcomes o JOIN predictions p ON o.prediction_id = p.id WHERE p.symbol = ? AND o.direction_correct = 1').get(symbol) as any)?.count || 0;
+    const t1Hits = (db.prepare('SELECT COUNT(*) as count FROM outcomes o JOIN predictions p ON o.prediction_id = p.id WHERE p.symbol = ? AND o.target1_hit = 1').get(symbol) as any)?.count || 0;
+    return { total, scored: outcomes, wins, accuracy: outcomes > 0 ? wins / outcomes : 0, t1HitRate: outcomes > 0 ? t1Hits / outcomes : 0 };
+  }
   const total = (db.prepare('SELECT COUNT(*) as count FROM predictions').get() as any)?.count || 0;
   const outcomes = (db.prepare('SELECT COUNT(*) as count FROM outcomes').get() as any)?.count || 0;
   const wins = (db.prepare('SELECT COUNT(*) as count FROM outcomes WHERE direction_correct = 1').get() as any)?.count || 0;
