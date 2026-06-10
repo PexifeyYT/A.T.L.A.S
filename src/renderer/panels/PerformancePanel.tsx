@@ -20,6 +20,8 @@ export const PerformancePanel: React.FC = () => {
       } catch { /* no db yet */ }
     };
     loadStats();
+    const interval = setInterval(loadStats, 60000); // refresh every 60s
+    return () => clearInterval(interval);
   }, []);
 
   const moduleOrder = [
