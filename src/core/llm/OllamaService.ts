@@ -355,10 +355,24 @@ export class OllamaService {
 
   private buildAnalysisPrompt(result: AnalysisResult): string {
     const sig = result.primarySignal;
-    const modules = result.modulesAgreed.join(', ');
-    const keyLevels = result.keyLevels.slice(0, 5).map(l => `${l.label}: $${l.price.toFixed(2)}`).join(', ');
+    const modules = result.modulesAgreed.map(m => m.replace('mod_', '')).join(', ');
+    const keyLevels = result.keyLevels.slice(0, 6).map(l => `${l.label}: $${l.price.toFixed(2)}`).join(' | ');
+    const entryMid = ((sig.entryZone[0] + sig.entryZone[1]) / 2).toFixed(2);
+    const risk = sig.direction === 'LONG'
+      ? (sig.entryZone[0] - sig.invalidation).toFixed(2)
+      : (sig.invalidation - sig.entryZone[1]).toFixed(2);
 
-    return `${ATLAS_SYSTEM_PROMPT}\n\nGenerate a 3-paragraph trading analysis:\n\nSYMBOL: ${result.symbol} | TIMEFRAME: ${result.timeframe}\nDIRECTION: ${sig.direction} | CONVICTION: ${result.confidence.toFixed(1)}/10\nENTRY: $${sig.entryZone[0].toFixed(2)}–$${sig.entryZone[1].toFixed(2)}\nT1: $${sig.target1.toFixed(2)} | T2: $${(sig.target2 ?? 0).toFixed(2)} | INV: $${sig.invalidation.toFixed(2)}\nKEY LEVELS: ${keyLevels}\nMODULES (${result.modulesAgreed.length}/13): ${modules}\nRISK FLAGS: ${result.riskFlags.join(', ') || 'None'}\n\nWrite: (1) market structure, (2) setup rationale, (3) risk management. Be concise and professional.`;
+    return `ATLAS analysis request for ${result.symbol} (${result.timeframe}):
+
+Signal: ${sig.direction} | Conviction: ${result.confidence.toFixed(1)}/10
+Entry: $${sig.entryZone[0].toFixed(2)}–$${sig.entryZone[1].toFixed(2)} (mid $${entryMid}) | Risk: $${risk}
+T1: $${sig.target1.toFixed(2)} | T2: $${(sig.target2 ?? sig.target1 * 1.05).toFixed(2)} | Invalidation: $${sig.invalidation.toFixed(2)}
+Strategy signal: ${sig.explanation}
+Modules agreed (${result.modulesAgreed.length}/13): ${modules}
+Key levels: ${keyLevels || 'None'}
+Risk flags: ${result.riskFlags.join(', ') || 'None'}
+
+Write a 3-paragraph professional analysis: (1) market structure and bias, (2) setup rationale with the specific entry/target/stop, (3) risk management and what would invalidate this trade. Be specific with price levels. No bullet points — narrative prose only.`;
   }
 
   clearChatHistory(): void {
