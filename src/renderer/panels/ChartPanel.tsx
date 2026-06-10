@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import {
   createChart,
   ColorType,
@@ -8,16 +8,7 @@ import {
   LineStyle,
 } from 'lightweight-charts';
 
-interface ChartPanelProps {
-  symbol: string;
-  timeframe: string;
-  analysisResult?: any;
-  activeTool?: DrawingTool;
-  onToolChange?: (tool: DrawingTool) => void;
-  liveQuote?: { price: number; changePercent: number } | null;
-}
-
-type DrawingTool = 'cursor' | 'hline' | 'vline' | 'trendline' | 'fib' | 'text';
+export type DrawingTool = 'cursor' | 'hline' | 'vline' | 'trendline' | 'fib' | 'text' | 'rect' | 'longpos' | 'shortpos';
 
 interface Drawing {
   id: string;
@@ -27,7 +18,27 @@ interface Drawing {
   label?: string;
 }
 
-export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analysisResult, activeTool: externalTool, onToolChange, liveQuote }) => {
+export interface ChartPanelRef {
+  startReplay: () => void;
+  stopReplay: () => void;
+  stepReplay: () => void;
+  togglePlayPause: () => void;
+  clearDrawings: () => void;
+}
+
+interface ChartPanelProps {
+  symbol: string;
+  timeframe: string;
+  analysisResult?: any;
+  activeTool?: DrawingTool;
+  onToolChange?: (tool: DrawingTool) => void;
+  liveQuote?: { price: number; changePercent: number } | null;
+  onReplayModeChange?: (active: boolean, playing: boolean, index: number, total: number) => void;
+}
+
+export const ChartPanel = forwardRef<ChartPanelRef, ChartPanelProps>(({
+  symbol, timeframe, analysisResult, activeTool: externalTool, onToolChange, liveQuote, onReplayModeChange,
+}, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -44,6 +55,7 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
   const [replayIndex, setReplayIndex] = useState(0);
   const [replayPlaying, setReplayPlaying] = useState(false);
   const replayTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [ohlcv, setOhlcv] = useState<{ open: number; high: number; low: number; close: number; volume?: number } | null>(null);
 
   // Drawing state — persisted per symbol+timeframe in localStorage
   const drawingKey = `atlas_drawings_${symbol}_${timeframe}`;
@@ -199,6 +211,17 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
       if (cancelled) return;
       setError(String(err));
       setLoading(false);
+    });
+
+    chart.subscribeCrosshairMove(param => {
+      if (param.time && candleSeries) {
+        const bar = param.seriesData.get(candleSeries) as any;
+        if (bar && bar.open !== undefined) {
+          setOhlcv({ open: bar.open, high: bar.high, low: bar.low, close: bar.close });
+        }
+      } else {
+        setOhlcv(null);
+      }
     });
 
     const handleResize = () => {
@@ -386,6 +409,45 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
       ctx.font = 'bold 13px monospace';
       ctx.fillStyle = '#f7a600';
       ctx.fillText(d.label || 'Label', d.points[0].x, d.points[0].y);
+    } else if (d.type === 'rect' && d.points.length >= 2) {
+      const x1 = d.points[0].x, y1 = d.points[0].y;
+      const x2 = d.points[1].x, y2 = d.points[1].y;
+      ctx.strokeStyle = '#2962ff';
+      ctx.fillStyle = 'rgba(41,98,255,0.08)';
+      ctx.beginPath();
+      ctx.rect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
+      ctx.fill();
+      ctx.stroke();
+    } else if ((d.type === 'longpos' || d.type === 'shortpos') && d.points.length >= 2) {
+      const isLong = d.type === 'longpos';
+      const entry = d.points[0].y;
+      const target = d.points[1].y;
+      const x1 = d.points[0].x, x2 = d.points[1].x ?? canvas.width - 40;
+      const profitColor = isLong ? 'rgba(38,166,154,0.15)' : 'rgba(239,83,80,0.15)';
+      const lossColor = isLong ? 'rgba(239,83,80,0.15)' : 'rgba(38,166,154,0.15)';
+      const entryY = isLong ? Math.max(entry, target) : Math.min(entry, target);
+      const tgtY = isLong ? Math.min(entry, target) : Math.max(entry, target);
+      // profit zone
+      ctx.fillStyle = profitColor;
+      ctx.fillRect(Math.min(x1,x2), tgtY, Math.abs(x2-x1), entryY - tgtY);
+      // entry line
+      ctx.strokeStyle = '#d1d4dc';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4,4]);
+      ctx.beginPath();
+      ctx.moveTo(Math.min(x1,x2), entry);
+      ctx.lineTo(Math.max(x1,x2), entry);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // target line
+      ctx.strokeStyle = isLong ? '#26a69a' : '#ef5350';
+      ctx.beginPath();
+      ctx.moveTo(Math.min(x1,x2), target);
+      ctx.lineTo(Math.max(x1,x2), target);
+      ctx.stroke();
+      ctx.fillStyle = isLong ? '#26a69a' : '#ef5350';
+      ctx.font = 'bold 11px monospace';
+      ctx.fillText(isLong ? '▲ Long' : '▼ Short', Math.min(x1,x2) + 4, entry - 4);
     }
   };
 
@@ -487,12 +549,15 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
       return;
     }
 
-    // trendline or fib: start drawing
+    // two-point drawings: trendline, fib, rect, longpos, shortpos
+    const colorMap: Partial<Record<DrawingTool, string>> = {
+      fib: '#26a69a', rect: '#2962ff', longpos: '#26a69a', shortpos: '#ef5350', trendline: '#2962ff',
+    };
     const d: Drawing = {
       id: Math.random().toString(36).slice(2),
       type: tool,
       points: [{ x, y, price }],
-      color: tool === 'fib' ? '#26a69a' : '#2962ff',
+      color: colorMap[tool] ?? '#2962ff',
     };
     activeDrawingRef.current = d;
     isDrawingRef.current = true;
@@ -531,16 +596,26 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
     redrawAll();
   }, [redrawAll]);
 
+  // Expose replay and drawing controls to parent via ref
+  useImperativeHandle(ref, () => ({
+    startReplay: () => startReplay(),
+    stopReplay: () => stopReplay(),
+    stepReplay: () => stepReplay(),
+    togglePlayPause: () => setReplayPlaying(p => !p),
+    clearDrawings: () => clearDrawings(),
+  }));
+
   // ─── Replay ──────────────────────────────────────────────────────────────────
   const startReplay = useCallback(() => {
     if (allBars.length === 0 || !candleSeriesRef.current) return;
+    const startIdx = Math.max(50, Math.floor(allBars.length * 0.4));
     setReplayMode(true);
     setReplayPlaying(false);
-    const startIdx = Math.max(50, Math.floor(allBars.length * 0.4));
     setReplayIndex(startIdx);
     candleSeriesRef.current.setData(allBars.slice(0, startIdx));
     chartRef.current?.timeScale().fitContent();
-  }, [allBars]);
+    onReplayModeChange?.(true, false, startIdx, allBars.length);
+  }, [allBars, onReplayModeChange]);
 
   const stopReplay = useCallback(() => {
     if (replayTimer.current) clearInterval(replayTimer.current);
@@ -550,7 +625,8 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
       candleSeriesRef.current.setData(allBars);
       chartRef.current?.timeScale().fitContent();
     }
-  }, [allBars]);
+    onReplayModeChange?.(false, false, allBars.length, allBars.length);
+  }, [allBars, onReplayModeChange]);
 
   const stepReplay = useCallback(() => {
     setReplayIndex(prev => {
@@ -571,91 +647,8 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
   }, [replayPlaying, replayMode, stepReplay]);
 
 
-  const tools: { id: DrawingTool; icon: string; label: string }[] = [
-    { id: 'cursor', icon: '↖', label: 'Cursor' },
-    { id: 'hline', icon: '─', label: 'H-Line' },
-    { id: 'vline', icon: '│', label: 'V-Line' },
-    { id: 'trendline', icon: '╱', label: 'Trend' },
-    { id: 'fib', icon: 'φ', label: 'Fib' },
-    { id: 'text', icon: 'T', label: 'Text' },
-  ];
-
   return (
     <div className="flex-1 flex flex-col bg-tv-bg overflow-hidden relative min-w-0">
-      {/* Drawing toolbar */}
-      <div className="flex items-center gap-1 px-2 py-1 border-b border-tv-border bg-tv-surface flex-shrink-0">
-        {tools.map(tool => (
-          <button
-            key={tool.id}
-            title={tool.label}
-            onClick={() => setActiveTool(tool.id)}
-            className={`w-7 h-7 text-xs rounded flex items-center justify-center transition-colors ${
-              activeTool === tool.id
-                ? 'bg-tv-accent text-white'
-                : 'text-tv-text-secondary hover:bg-tv-surface2 hover:text-tv-text'
-            }`}
-          >
-            {tool.icon}
-          </button>
-        ))}
-
-        {drawings.length > 0 && (
-          <button
-            onClick={clearDrawings}
-            title="Clear drawings"
-            className="w-7 h-7 text-xs rounded flex items-center justify-center text-tv-red hover:bg-tv-red/10 transition-colors"
-          >
-            🗑
-          </button>
-        )}
-
-        <div className="w-px h-4 bg-tv-border mx-1" />
-
-        {!replayMode ? (
-          <button
-            onClick={startReplay}
-            disabled={allBars.length === 0}
-            className="px-2 h-7 text-xs rounded text-tv-text-secondary hover:bg-tv-surface2 hover:text-tv-text transition-colors disabled:opacity-40"
-          >
-            ⏪ Replay
-          </button>
-        ) : (
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setReplayPlaying(p => !p)}
-              className="px-2 h-7 text-xs rounded bg-tv-accent/20 text-tv-accent hover:bg-tv-accent/30 transition-colors"
-            >
-              {replayPlaying ? '⏸' : '▶'}
-            </button>
-            <button onClick={stepReplay} className="px-2 h-7 text-xs rounded text-tv-text-secondary hover:bg-tv-surface2 transition-colors">
-              ⏭
-            </button>
-            <span className="text-xs text-tv-text-secondary tabular-nums">
-              {replayIndex}/{allBars.length}
-            </span>
-            <button onClick={stopReplay} className="px-2 h-7 text-xs rounded text-tv-red hover:bg-tv-red/10 transition-colors">
-              ✕
-            </button>
-            <span className="text-xs text-tv-orange font-semibold animate-pulse ml-1">● REPLAY</span>
-          </div>
-        )}
-
-        <div className="ml-auto flex items-center gap-3 text-xs text-tv-text-secondary">
-          <span>
-            <span className="inline-block w-3 h-0.5 bg-yellow-400 mr-1 align-middle" />
-            <span className="text-yellow-400">EMA21</span>
-          </span>
-          <span>
-            <span className="inline-block w-3 h-0.5 bg-tv-accent mr-1 align-middle" />
-            <span className="text-tv-accent">EMA50</span>
-          </span>
-          <span className="opacity-60">Vol</span>
-          {allBars.length > 0 && (
-            <span className="opacity-60">{allBars.length} bars</span>
-          )}
-        </div>
-      </div>
-
       {/* Chart + drawing overlay */}
       <div className="flex-1 min-h-0 relative">
         <div
@@ -677,20 +670,28 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
         />
       </div>
 
-      {/* Live price overlay */}
-      {liveQuote && !loading && (
-        <div className="absolute top-2 left-2 z-10 pointer-events-none">
-          <div className="bg-tv-surface/80 border border-tv-border/50 rounded px-2 py-1">
-            <span className="text-xs font-bold text-tv-text mr-2">{symbol}</span>
-            <span className="text-sm font-mono font-bold text-tv-text">
-              ${liveQuote.price > 1000
-                ? liveQuote.price.toLocaleString(undefined, { maximumFractionDigits: 2 })
-                : liveQuote.price.toFixed(2)}
-            </span>
-            <span className={`text-xs ml-2 font-medium ${liveQuote.changePercent >= 0 ? 'text-tv-green' : 'text-tv-red'}`}>
-              {liveQuote.changePercent >= 0 ? '+' : ''}{liveQuote.changePercent.toFixed(2)}%
-            </span>
-          </div>
+      {/* TV-style OHLCV overlay — top left */}
+      {!loading && (
+        <div className="absolute top-2 left-2 z-10 pointer-events-none flex items-baseline gap-3 select-none">
+          <span className="text-[12px] font-bold text-tv-text tracking-wide">{symbol}</span>
+          <span className="text-[11px] text-tv-text-secondary">{timeframe}</span>
+          {(ohlcv ?? (liveQuote ? { open: liveQuote.price, high: liveQuote.price, low: liveQuote.price, close: liveQuote.price } : null)) && (() => {
+            const bar = ohlcv ?? { open: liveQuote!.price, high: liveQuote!.price, low: liveQuote!.price, close: liveQuote!.price };
+            const up = bar.close >= bar.open;
+            const fmt = (n: number) => n > 999 ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : n.toFixed(2);
+            const chg = ((bar.close - bar.open) / bar.open * 100);
+            return (
+              <>
+                <span className="text-[11px] text-tv-text-secondary">O <span className={up ? 'text-tv-green' : 'text-tv-red'}>{fmt(bar.open)}</span></span>
+                <span className="text-[11px] text-tv-text-secondary">H <span className="text-tv-green">{fmt(bar.high)}</span></span>
+                <span className="text-[11px] text-tv-text-secondary">L <span className="text-tv-red">{fmt(bar.low)}</span></span>
+                <span className="text-[11px] text-tv-text-secondary">C <span className={up ? 'text-tv-green' : 'text-tv-red'}>{fmt(bar.close)}</span></span>
+                <span className={`text-[11px] font-medium ${up ? 'text-tv-green' : 'text-tv-red'}`}>{up ? '+' : ''}{chg.toFixed(2)}%</span>
+                <span className="text-[11px] text-yellow-400/80">EMA21</span>
+                <span className="text-[11px] text-tv-accent/80">EMA50</span>
+              </>
+            );
+          })()}
         </div>
       )}
 
@@ -727,11 +728,14 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
           {activeTool === 'trendline' && 'Click and drag to draw · Right-click to delete'}
           {activeTool === 'fib' && 'Click and drag for Fibonacci · Right-click to delete'}
           {activeTool === 'text' && 'Click to place label · Right-click to delete'}
+          {activeTool === 'rect' && 'Click and drag to draw rectangle · Right-click to delete'}
+          {activeTool === 'longpos' && 'Click and drag to mark long position · Right-click to delete'}
+          {activeTool === 'shortpos' && 'Click and drag to mark short position · Right-click to delete'}
         </div>
       )}
     </div>
   );
-};
+});
 
 function calcEMA(data: CandlestickData[], period: number): { time: any; value: number }[] {
   const k = 2 / (period + 1);

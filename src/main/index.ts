@@ -16,7 +16,6 @@ import { SentimentStrategy } from '../core/strategies/SentimentStrategy';
 import { SeasonalityStrategy } from '../core/strategies/SeasonalityStrategy';
 import { OrderFlowStrategy } from '../core/strategies/OrderFlowStrategy';
 import { LearningEngine } from '../core/learning/LearningEngine';
-import { OllamaService } from '../core/llm/OllamaService';
 import { OutcomeChecker } from '../core/learning/OutcomeChecker';
 import {
   initDatabase,
@@ -38,7 +37,6 @@ const analysisEngine = new AnalysisEngine();
 const marketDataService = new MarketDataService();
 const learningEngine = new LearningEngine();
 const outcomeChecker = new OutcomeChecker(marketDataService);
-const ollamaService = new OllamaService();
 
 const allModuleNames = [
   'mod_smc', 'mod_tjr', 'mod_wyckoff', 'mod_elliott', 'mod_volume_profile',
@@ -133,7 +131,6 @@ app.on('ready', () => {
     console.error('[ATLAS] DB init failed:', err);
   }
 
-  ollamaService.init().catch(() => {});
   createWindow();
   setInterval(runLearningLoop, 30 * 60 * 1000);
 });
@@ -231,9 +228,6 @@ ipcMain.handle('run-analysis', async (_e, symbol: string, timeframe: string, ohl
     // Inject current learned weights into strategies before analysis
     analysisEngine.updateWeights(learningEngine.getAllWeights());
     const result = await analysisEngine.analyze(ohlcvData, context);
-    const llmText = await ollamaService.generateAnalysis(result);
-    (result as any).llmText = llmText;
-    (result as any).llmModel = ollamaService.getModel() ?? 'rule-based';
 
     if (result.confidence >= 6.0 && result.primarySignal.direction !== 'NEUTRAL') {
       const prediction: Prediction = {
@@ -289,22 +283,6 @@ ipcMain.handle('get-symbol-data', async (_e, symbol: string) => {
   }
 });
 
-ipcMain.handle('get-llm-status', async () => {
-  return {
-    success: true,
-    data: { available: ollamaService.isAvailable(), model: ollamaService.getModel() },
-  };
-});
-
-ipcMain.handle('chat-message', async (_e, message: string, context: any) => {
-  try {
-    const reply = await ollamaService.chat(message, context);
-    return { success: true, data: reply };
-  } catch (error) {
-    return { success: false, error: (error as Error).message };
-  }
-});
-
 ipcMain.handle('search-symbols', async (_e, query: string) => {
   try {
     const results = await marketDataService.searchSymbols(query);
@@ -331,7 +309,6 @@ ipcMain.handle('save-settings', async (_e, settings: any) => {
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
     if (settings.anthropicApiKey !== undefined) {
       process.env.ANTHROPIC_API_KEY = settings.anthropicApiKey || '';
-      ollamaService.setAnthropicKey(settings.anthropicApiKey || '');
     }
     return { success: true };
   } catch (error) {
@@ -352,7 +329,3 @@ ipcMain.handle('load-settings', async () => {
   }
 });
 
-ipcMain.handle('clear-chat-history', async () => {
-  ollamaService.clearChatHistory();
-  return { success: true };
-});
