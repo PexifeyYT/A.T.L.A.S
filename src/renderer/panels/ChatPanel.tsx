@@ -66,7 +66,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMsg]);
+    setMessages(prev => { const next = [...prev, userMsg]; return next.length > 100 ? next.slice(-100) : next; });
     setInput('');
     setLoading(true);
 
@@ -80,7 +80,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         content: result.success ? result.data : `Error: ${result.error}`,
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, reply]);
+      setMessages(prev => { const next = [...prev, reply]; return next.length > 100 ? next.slice(-100) : next; });
     } catch {
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),

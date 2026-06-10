@@ -124,7 +124,7 @@ const WatchlistContent: React.FC = () => {
 
   useEffect(() => {
     fetchAll();
-    const interval = setInterval(fetchAll, 15000); // poll every 15s
+    const interval = setInterval(fetchAll, 30000); // poll every 30s — 10 symbols, rate-limit headroom
     return () => clearInterval(interval);
   }, [fetchAll]);
 
