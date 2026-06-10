@@ -76,11 +76,11 @@ export class SeasonalityStrategy implements IStrategyModule {
 
   private getDayOfWeek(d: Date): string {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    return days[d.getDay()];
+    return days[d.getUTCDay()];
   }
 
   private getMonthlyPattern(d: Date): number {
-    const day = d.getDate();
+    const day = d.getUTCDate();
     if (day < 5) return 0.3;  // Turn of month = bullish
     if (day > 25) return -0.2; // End of month = bearish
     return 0;

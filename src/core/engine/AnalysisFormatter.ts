@@ -40,8 +40,9 @@ export class AnalysisFormatter {
     const t2 = sig.target2?.toFixed(2);
     const inv = sig.invalidation.toFixed(2);
 
-    const t1PctStr = sig.target1 > 0 && sig.entryZone[0] > 0
-      ? `(${(((sig.target1 - sig.entryZone[0]) / sig.entryZone[0]) * 100).toFixed(1)}%)`
+    const entryRef = bullish ? sig.entryZone[0] : sig.entryZone[1];
+    const t1PctStr = sig.target1 > 0 && entryRef > 0
+      ? `(${(((sig.target1 - entryRef) / entryRef) * 100).toFixed(1)}%)`
       : '';
 
     const lines: string[] = [

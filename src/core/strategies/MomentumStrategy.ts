@@ -147,7 +147,9 @@ export class MomentumStrategy implements IStrategyModule {
     const avgGain = gains / period;
     const avgLoss = losses / period;
 
-    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    if (avgLoss === 0) return 100;
+    if (avgGain === 0) return 0;
+    const rs = avgGain / avgLoss;
     return 100 - 100 / (1 + rs);
   }
 

@@ -340,8 +340,8 @@ const AnalysisContent: React.FC<{
               <span>Risk:Reward</span>
               <span className="font-medium">
                 {bullish
-                  ? `1:${((primary.target1 - primary.entryZone[0]) / (primary.entryZone[0] - primary.invalidation)).toFixed(1)}`
-                  : `1:${((primary.entryZone[0] - primary.target1) / (primary.invalidation - primary.entryZone[0])).toFixed(1)}`
+                  ? `1:${((primary.target1 - primary.entryZone[0]) / Math.max(primary.entryZone[0] - primary.invalidation, 0.01)).toFixed(1)}`
+                  : `1:${((primary.entryZone[1] - primary.target1) / Math.max(primary.invalidation - primary.entryZone[1], 0.01)).toFixed(1)}`
                 }
               </span>
             </div>
