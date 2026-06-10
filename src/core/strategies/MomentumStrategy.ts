@@ -21,7 +21,7 @@ export class MomentumStrategy implements IStrategyModule {
     }
 
     const rsi = this.calculateRSI(bars, 14);
-    const macd = this.calculateMACD(bars);
+    const { current: macd, previous: prevMACD } = this.calculateMACD(bars);
     const stoch = this.calculateStochastic(bars, 14);
 
     const lastBar = bars[bars.length - 1];
@@ -57,7 +57,6 @@ export class MomentumStrategy implements IStrategyModule {
     }
 
     // MACD bullish cross
-    const prevMACD = this.calculateMACD(bars.slice(0, -1));
     if (prevMACD.macd <= prevMACD.signal && macd.macd > macd.signal && rsi < 70) {
       return {
         direction: 'LONG',
@@ -153,8 +152,12 @@ export class MomentumStrategy implements IStrategyModule {
     return 100 - 100 / (1 + rs);
   }
 
-  private calculateMACD(bars: any[]) {
-    if (bars.length < 26) return { macd: 0, signal: 0, histogram: 0 };
+  private calculateMACD(bars: any[]): {
+    current: { macd: number; signal: number; histogram: number };
+    previous: { macd: number; signal: number; histogram: number };
+  } {
+    const zero = { macd: 0, signal: 0, histogram: 0 };
+    if (bars.length < 26) return { current: zero, previous: zero };
 
     // Incremental EMA12 and EMA26 — O(n) single pass
     const k12 = 2 / 13, k26 = 2 / 27;
@@ -173,15 +176,21 @@ export class MomentumStrategy implements IStrategyModule {
       macdLine.push(ema12 - ema26);
     }
 
-    // Signal = 9 EMA of MACD line
+    // Signal = 9 EMA of MACD line; track previous signal value too
     const k9 = 2 / 10;
     let signal = macdLine.slice(0, 9).reduce((s, v) => s + v, 0) / Math.min(9, macdLine.length);
+    let prevSignal = signal;
     for (let i = 9; i < macdLine.length; i++) {
+      prevSignal = signal;
       signal = macdLine[i] * k9 + signal * (1 - k9);
     }
 
     const macd = macdLine[macdLine.length - 1];
-    return { macd, signal, histogram: macd - signal };
+    const prevMacd = macdLine[macdLine.length - 2] ?? macd;
+    return {
+      current: { macd, signal, histogram: macd - signal },
+      previous: { macd: prevMacd, signal: prevSignal, histogram: prevMacd - prevSignal },
+    };
   }
 
   private calculateStochastic(bars: any[], period: number) {

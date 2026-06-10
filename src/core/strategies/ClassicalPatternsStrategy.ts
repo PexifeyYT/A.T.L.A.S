@@ -47,7 +47,6 @@ export class ClassicalPatternsStrategy implements IStrategyModule {
 
     const flag = this.detectFlag(bars);
     if (flag) {
-      const last = bars[bars.length - 1];
       if (flag.direction === 'up') {
         return {
           direction: 'LONG',
@@ -74,7 +73,6 @@ export class ClassicalPatternsStrategy implements IStrategyModule {
           weight: this.weight,
         };
       }
-      void last;
     }
 
     const triangle = this.detectTriangle(bars);
