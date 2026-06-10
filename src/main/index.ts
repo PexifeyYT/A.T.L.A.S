@@ -10,6 +10,8 @@ import { ElliottWaveStrategy } from '../core/strategies/ElliottWaveStrategy';
 import { VolumeProfileStrategy } from '../core/strategies/VolumeProfileStrategy';
 import { MASystemStrategy } from '../core/strategies/MASystemStrategy';
 import { MomentumStrategy } from '../core/strategies/MomentumStrategy';
+import { ClassicalPatternsStrategy } from '../core/strategies/ClassicalPatternsStrategy';
+import { VolatilityStrategy } from '../core/strategies/VolatilityStrategy';
 import { OHLCVData, MarketContext } from '../core/types';
 
 let mainWindow: BrowserWindow | null = null;
@@ -18,7 +20,7 @@ let mainWindow: BrowserWindow | null = null;
 const analysisEngine = new AnalysisEngine();
 const dataFetcher = new DataFetcher();
 
-// Register strategies (7 total in Phase 3)
+// Register strategies (9 total in Phase 4)
 analysisEngine.registerStrategy(new SMCStrategy());
 analysisEngine.registerStrategy(new TJRStrategy());
 analysisEngine.registerStrategy(new WyckoffStrategy());
@@ -26,6 +28,8 @@ analysisEngine.registerStrategy(new ElliottWaveStrategy());
 analysisEngine.registerStrategy(new VolumeProfileStrategy());
 analysisEngine.registerStrategy(new MASystemStrategy());
 analysisEngine.registerStrategy(new MomentumStrategy());
+analysisEngine.registerStrategy(new ClassicalPatternsStrategy());
+analysisEngine.registerStrategy(new VolatilityStrategy());
 
 const createWindow = () => {
   mainWindow = new BrowserWindow({
