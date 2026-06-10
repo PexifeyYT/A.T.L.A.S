@@ -87,30 +87,39 @@ export class ElliottWaveStrategy implements IStrategyModule {
 
   private identifyWaves(bars: any[]) {
     const recent = bars.slice(-35);
-
-    // Simplified: detect 5-bar impulse pattern
-    const lows = recent.map((b) => b.low);
-    const highs = recent.map((b) => b.high);
+    const lows = recent.map((b: any) => b.low);
+    const highs = recent.map((b: any) => b.high);
 
     const minLow = Math.min(...lows);
     const maxHigh = Math.max(...highs);
+    const swingSize = (maxHigh - minLow) / minLow;
+
+    // Require meaningful swing (>3% range) to avoid noise
+    if (swingSize < 0.03) return null;
+
     const minIndex = lows.indexOf(minLow);
     const maxIndex = highs.indexOf(maxHigh);
 
+    const lastClose = bars[bars.length - 1].close;
+    const retrace = maxIndex > minIndex
+      ? (maxHigh - lastClose) / (maxHigh - minLow) // how much has price pulled back from top
+      : (lastClose - minLow) / (maxHigh - minLow); // how much has price bounced from bottom
+
+    // Only signal if price has retraced 23-78% (wave 4 territory)
+    if (retrace < 0.23 || retrace > 0.78) return null;
+
     if (maxIndex > minIndex) {
-      // Uptrend pattern
       return {
         direction: 'LONG',
-        wave1High: highs[5] || maxHigh * 0.98,
+        wave1High: highs[Math.min(5, highs.length - 1)] || maxHigh * 0.97,
         wave3High: maxHigh,
         wave3Low: minLow,
       };
     }
 
-    // Downtrend pattern
     return {
       direction: 'SHORT',
-      wave1Low: lows[5] || minLow * 1.02,
+      wave1Low: lows[Math.min(5, lows.length - 1)] || minLow * 1.03,
       wave3High: maxHigh,
       wave3Low: minLow,
     };
