@@ -377,6 +377,43 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
     }
   }, []);
 
+  const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const rect = overlayRef.current!.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    // Find nearest drawing within 12px
+    let nearest: Drawing | null = null;
+    let nearestDist = 12;
+
+    for (const d of drawingsRef.current) {
+      let dist = Infinity;
+      if (d.type === 'hline' && d.points.length >= 1) {
+        dist = Math.abs(d.points[0].y - my);
+      } else if ((d.type === 'trendline' || d.type === 'fib') && d.points.length >= 2) {
+        const p1 = d.points[0], p2 = d.points[1];
+        const dx = p2.x - p1.x, dy = p2.y - p1.y;
+        const len2 = dx * dx + dy * dy;
+        if (len2 > 0) {
+          const t = Math.max(0, Math.min(1, ((mx - p1.x) * dx + (my - p1.y) * dy) / len2));
+          const px = p1.x + t * dx, py = p1.y + t * dy;
+          dist = Math.sqrt((mx - px) ** 2 + (my - py) ** 2);
+        }
+      } else if (d.type === 'text' && d.points.length >= 1) {
+        dist = Math.sqrt((mx - d.points[0].x) ** 2 + (my - d.points[0].y) ** 2);
+      }
+      if (dist < nearestDist) { nearestDist = dist; nearest = d; }
+    }
+
+    if (nearest) {
+      const id = nearest.id;
+      setDrawings(prev => prev.filter(d => d.id !== id));
+      drawingsRef.current = drawingsRef.current.filter(d => d.id !== id);
+      redrawAll();
+    }
+  }, [redrawAll]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const tool = activeToolRef.current;
     if (tool === 'cursor') return;
@@ -618,6 +655,7 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+          onContextMenu={handleContextMenu}
         />
       </div>
 
@@ -666,10 +704,10 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
       {/* Drawing mode hint */}
       {activeTool !== 'cursor' && !loading && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-tv-surface/90 border border-tv-border rounded px-3 py-1.5 text-xs text-tv-text-secondary pointer-events-none">
-          {activeTool === 'hline' && 'Click anywhere to place horizontal line'}
-          {activeTool === 'trendline' && 'Click and drag to draw trend line'}
-          {activeTool === 'fib' && 'Click and drag to place Fibonacci levels'}
-          {activeTool === 'text' && 'Click to place text label'}
+          {activeTool === 'hline' && 'Click to place · Right-click to delete'}
+          {activeTool === 'trendline' && 'Click and drag to draw · Right-click to delete'}
+          {activeTool === 'fib' && 'Click and drag for Fibonacci · Right-click to delete'}
+          {activeTool === 'text' && 'Click to place label · Right-click to delete'}
         </div>
       )}
     </div>
