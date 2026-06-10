@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Layout } from '@/renderer/layouts/Layout';
 import { ChartPanel } from '@/renderer/panels/ChartPanel';
 import { TopToolbar } from '@/renderer/components/TopToolbar';
@@ -23,6 +23,28 @@ export default function App() {
   const [scanResults, setScanResults] = useState<any[]>([]);
   const [scanning, setScanning] = useState(false);
   const [showScan, setShowScan] = useState(false);
+  const [liveQuote, setLiveQuote] = useState<{ price: number; changePercent: number } | null>(null);
+  const liveQuotePollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Single shared live quote poll — feeds TopToolbar, ChartPanel, BottomBar
+  useEffect(() => {
+    let active = true;
+    const fetchQuote = async () => {
+      try {
+        const res = await window.api.fetchLiveQuote(symbol);
+        if (active && res.success && res.data) {
+          setLiveQuote({ price: res.data.price, changePercent: res.data.changePercent });
+        }
+      } catch {}
+      if (active) liveQuotePollRef.current = setTimeout(fetchQuote, 10000);
+    };
+    setLiveQuote(null);
+    fetchQuote();
+    return () => {
+      active = false;
+      if (liveQuotePollRef.current) clearTimeout(liveQuotePollRef.current);
+    };
+  }, [symbol]);
 
   const handleRunAnalysis = useCallback(async () => {
     try {
@@ -99,12 +121,13 @@ export default function App() {
         analyzing={analysisLoading}
         onScan={handleScan}
         scanning={scanning}
+        liveQuote={liveQuote}
       />
 
       <div className="flex flex-1 overflow-hidden">
         <LeftSidebar activeTool={activeTool} onToolChange={setActiveTool} />
 
-        <ChartPanel symbol={symbol} timeframe={timeframe} analysisResult={analysisResult} activeTool={activeTool} onToolChange={setActiveTool} />
+        <ChartPanel symbol={symbol} timeframe={timeframe} analysisResult={analysisResult} activeTool={activeTool} onToolChange={setActiveTool} liveQuote={liveQuote} />
 
         {showScan ? (
           <ScanResultsPanel
@@ -127,7 +150,7 @@ export default function App() {
         )}
       </div>
 
-      <BottomBar symbol={symbol} />
+      <BottomBar symbol={symbol} liveQuote={liveQuote} />
     </Layout>
   );
 }

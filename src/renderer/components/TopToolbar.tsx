@@ -11,6 +11,7 @@ interface TopToolbarProps {
   analyzing?: boolean;
   onScan?: () => void;
   scanning?: boolean;
+  liveQuote?: { price: number; changePercent: number } | null;
 }
 
 const TIMEFRAMES = ['1m', '5m', '15m', '30m', '1H', '2H', '4H', '1D', '1W', '1M'];
@@ -24,23 +25,10 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
   analyzing = false,
   onScan,
   scanning = false,
+  liveQuote: quote = null,
 }) => {
   const [showSearch, setShowSearch] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [quote, setQuote] = useState<{ price: number; changePercent: number } | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    const poll = async () => {
-      try {
-        const r = await window.api.fetchLiveQuote(symbol);
-        if (active && r.success && r.data) setQuote({ price: r.data.price, changePercent: r.data.changePercent });
-      } catch {}
-    };
-    poll();
-    const interval = setInterval(poll, 15000);
-    return () => { active = false; clearInterval(interval); };
-  }, [symbol]);
 
   // Global hotkey: / or Ctrl+K opens search
   useEffect(() => {

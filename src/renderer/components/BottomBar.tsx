@@ -1,40 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface BottomBarProps {
   symbol?: string;
+  liveQuote?: { price: number; changePercent: number } | null;
 }
 
-export const BottomBar: React.FC<BottomBarProps> = ({ symbol }) => {
+export const BottomBar: React.FC<BottomBarProps> = ({ symbol, liveQuote: quote = null }) => {
   const [time, setTime] = useState(new Date());
-  const [quote, setQuote] = useState<{ price: number; changePercent: number } | null>(null);
-  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
-
-  useEffect(() => {
-    if (!symbol) return;
-    let active = true;
-
-    const fetchQuote = async () => {
-      try {
-        const res = await window.api.fetchLiveQuote(symbol);
-        if (active && res.success && res.data) {
-          setQuote({ price: res.data.price, changePercent: res.data.changePercent });
-        }
-      } catch {}
-      if (active) pollRef.current = setTimeout(fetchQuote, 10000);
-    };
-
-    setQuote(null);
-    fetchQuote();
-    return () => {
-      active = false;
-      if (pollRef.current) clearTimeout(pollRef.current);
-    };
-  }, [symbol]);
 
   const timeStr = time.toUTCString().split(' ')[4];
   const open = isMarketOpen(time);

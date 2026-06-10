@@ -14,6 +14,7 @@ interface ChartPanelProps {
   analysisResult?: any;
   activeTool?: DrawingTool;
   onToolChange?: (tool: DrawingTool) => void;
+  liveQuote?: { price: number; changePercent: number } | null;
 }
 
 type DrawingTool = 'cursor' | 'hline' | 'vline' | 'trendline' | 'fib' | 'text';
@@ -26,9 +27,8 @@ interface Drawing {
   label?: string;
 }
 
-export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analysisResult, activeTool: externalTool, onToolChange }) => {
+export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analysisResult, activeTool: externalTool, onToolChange, liveQuote }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [liveQuote, setLiveQuote] = useState<{ price: number; changePercent: number } | null>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -569,19 +569,6 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
     return () => { if (replayTimer.current) clearInterval(replayTimer.current); };
   }, [replayPlaying, replayMode, stepReplay]);
 
-  // Live price polling
-  useEffect(() => {
-    let active = true;
-    const poll = async () => {
-      try {
-        const r = await window.api.fetchLiveQuote(symbol);
-        if (active && r.success && r.data) setLiveQuote({ price: r.data.price, changePercent: r.data.changePercent });
-      } catch {}
-    };
-    poll();
-    const interval = setInterval(poll, 10000);
-    return () => { active = false; clearInterval(interval); };
-  }, [symbol]);
 
   const tools: { id: DrawingTool; icon: string; label: string }[] = [
     { id: 'cursor', icon: '↖', label: 'Cursor' },
