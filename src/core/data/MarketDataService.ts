@@ -114,7 +114,7 @@ export class MarketDataService {
 
       const quotes = resp.data.quotes ?? [];
       return quotes
-        .filter((q: any) => q.symbol && q.quoteType !== 'FUTURE' || q.quoteType === 'FUTURE')
+        .filter((q: any) => q.symbol && ['EQUITY', 'ETF', 'CRYPTOCURRENCY', 'INDEX', 'FUTURE', 'CURRENCY', 'MUTUALFUND'].includes(q.quoteType))
         .map((q: any) => ({
           symbol: q.symbol,
           name: q.longname || q.shortname || q.symbol,
@@ -205,12 +205,24 @@ export class MarketDataService {
       const result = resp.data.chart.result?.[0];
       if (!result) return null;
 
+      // Prefer meta fields — more reliable, always present
+      const meta = result.meta;
+      if (meta?.regularMarketPrice) {
+        const price = meta.regularMarketPrice;
+        const prev = meta.chartPreviousClose ?? meta.previousClose ?? price;
+        const change = price - prev;
+        const changePercent = prev > 0 ? (change / prev) * 100 : 0;
+        return { price, change, changePercent };
+      }
+
+      // Fall back to close array
       const quote = result.indicators.quote[0];
-      const n = quote.close.length;
-      const price = quote.close[n - 1];
-      const prev = quote.close[n - 2] ?? price;
+      const closes = quote.close.filter((c: number | null) => c != null);
+      if (closes.length < 1) return null;
+      const price = closes[closes.length - 1];
+      const prev = closes[closes.length - 2] ?? price;
       const change = price - prev;
-      const changePercent = (change / prev) * 100;
+      const changePercent = prev > 0 ? (change / prev) * 100 : 0;
 
       return { price, change, changePercent };
     } catch {
