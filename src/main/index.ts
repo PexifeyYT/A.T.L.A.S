@@ -1,8 +1,23 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import isDev from 'electron-is-dev';
+import { AnalysisEngine } from '../core/engine/AnalysisEngine';
+import { DataFetcher } from '../core/data/DataFetcher';
+import { SMCStrategy } from '../core/strategies/SMCStrategy';
+import { TJRStrategy } from '../core/strategies/TJRStrategy';
+import { WyckoffStrategy } from '../core/strategies/WyckoffStrategy';
+import { OHLCVData, MarketContext } from '../core/types';
 
 let mainWindow: BrowserWindow | null = null;
+
+// Initialize analysis engine with strategies
+const analysisEngine = new AnalysisEngine();
+const dataFetcher = new DataFetcher();
+
+// Register strategies
+analysisEngine.registerStrategy(new SMCStrategy());
+analysisEngine.registerStrategy(new TJRStrategy());
+analysisEngine.registerStrategy(new WyckoffStrategy());
 
 const createWindow = () => {
   mainWindow = new BrowserWindow({
@@ -43,8 +58,43 @@ app.on('activate', () => {
   }
 });
 
-// IPC handlers will go here
+// IPC Handlers
+ipcMain.handle('fetch-market-data', async (_event, symbol: string, timeframe: string) => {
+  try {
+    const data = await dataFetcher.fetchOHLCV(symbol, timeframe, 100);
+    return { success: true, data };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
+});
+
+ipcMain.handle(
+  'run-analysis',
+  async (_event, symbol: string, _timeframe: string, ohlcvData: OHLCVData) => {
+    try {
+      const context: MarketContext = {
+        symbol,
+        timestamp: Date.now(),
+        macroTrend: 'UPTREND',
+        volatility: 0.5,
+      };
+
+      const result = await analysisEngine.analyze(ohlcvData, context);
+      return { success: true, data: result };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMessage };
+    }
+  },
+);
+
 ipcMain.handle('get-symbol-data', async (_event, symbol: string) => {
-  // Placeholder
-  return { symbol, data: [] };
+  try {
+    const data = await dataFetcher.fetchOHLCV(symbol, '1D', 100);
+    return { success: true, data };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: errorMessage };
+  }
 });

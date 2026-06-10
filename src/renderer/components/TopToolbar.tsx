@@ -6,6 +6,8 @@ interface TopToolbarProps {
   onSymbolChange: (symbol: string) => void;
   timeframe: string;
   onTimeframeChange: (tf: string) => void;
+  onAnalyze?: () => void;
+  analyzing?: boolean;
 }
 
 const TIMEFRAMES = ['1m', '5m', '15m', '30m', '1H', '2H', '4H', '1D', '1W', '1M'];
@@ -15,6 +17,8 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
   onSymbolChange,
   timeframe,
   onTimeframeChange,
+  onAnalyze,
+  analyzing = false,
 }) => {
   const [showSearch, setShowSearch] = useState(false);
 
@@ -66,8 +70,12 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
         <button className="toolbar-button" title="Redo">
           ↷
         </button>
-        <button className="toolbar-button bg-tv-accent text-tv-bg font-bold">
-          🤖 ANALYZE
+        <button
+          onClick={onAnalyze}
+          disabled={analyzing}
+          className={`toolbar-button font-bold ${analyzing ? 'opacity-50 cursor-not-allowed' : 'bg-tv-accent text-tv-bg hover:bg-blue-600'}`}
+        >
+          🤖 {analyzing ? 'ANALYZING...' : 'ANALYZE'}
         </button>
         <button className="toolbar-button">
           📋 SCAN

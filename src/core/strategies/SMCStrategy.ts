@@ -14,7 +14,7 @@ export class SMCStrategy implements IStrategyModule {
   name = 'mod_smc';
   weight = 1.82;
 
-  analyze(data: OHLCVData, context: MarketContext): StrategySignal {
+  analyze(data: OHLCVData, _context: MarketContext): StrategySignal {
     const bars = data.bars;
     if (bars.length < 20) {
       return this.neutralSignal();

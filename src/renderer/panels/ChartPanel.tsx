@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createChart, ColorType } from 'lightweight-charts';
 
 interface ChartPanelProps {
@@ -8,70 +8,96 @@ interface ChartPanelProps {
 
 export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Create chart
-    const chart = createChart(containerRef.current, {
-      layout: {
-        background: { type: ColorType.Solid, color: '#131722' },
-        textColor: '#d1d4dc',
-      },
-      width: containerRef.current.clientWidth,
-      height: containerRef.current.clientHeight,
-      timeScale: {
-        timeVisible: true,
-        secondsVisible: true,
-      },
-    });
+    const loadAndRender = async () => {
+      try {
+        setLoading(true);
 
-    const candlestickSeries = chart.addCandlestickSeries({
-      upColor: '#26a69a',
-      downColor: '#ef5350',
-      borderDownColor: '#ef5350',
-      borderUpColor: '#26a69a',
-      wickDownColor: '#ef5350',
-      wickUpColor: '#26a69a',
-    });
+        // Fetch market data
+        const result = await window.api.fetchMarketData(symbol, timeframe);
+        if (!result.success) {
+          console.error('Failed to fetch data:', result.error);
+          return;
+        }
 
-    // Sample data
-    const data = [
-      { time: '2024-06-01', open: 100, high: 105, low: 99, close: 103 },
-      { time: '2024-06-02', open: 103, high: 108, low: 102, close: 106 },
-      { time: '2024-06-03', open: 106, high: 110, low: 105, close: 109 },
-      { time: '2024-06-04', open: 109, high: 112, low: 108, close: 111 },
-      { time: '2024-06-05', open: 111, high: 115, low: 110, close: 113 },
-      { time: '2024-06-06', open: 113, high: 116, low: 112, close: 114 },
-      { time: '2024-06-07', open: 114, high: 118, low: 113, close: 117 },
-      { time: '2024-06-08', open: 117, high: 120, low: 116, close: 119 },
-      { time: '2024-06-09', open: 119, high: 122, low: 118, close: 121 },
-    ];
+        const ohlcvData = result.data;
+        const bars = ohlcvData.bars;
 
-    candlestickSeries.setData(data);
-    chart.timeScale().fitContent();
-
-    // Handle resize
-    const handleResize = () => {
-      if (containerRef.current) {
-        chart.applyOptions({
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
+        // Create chart
+        const chart = createChart(containerRef.current!, {
+          layout: {
+            background: { type: ColorType.Solid, color: '#131722' },
+            textColor: '#d1d4dc',
+          },
+          width: containerRef.current!.clientWidth,
+          height: containerRef.current!.clientHeight,
+          timeScale: {
+            timeVisible: true,
+            secondsVisible: false,
+          },
         });
+
+        const candlestickSeries = chart.addCandlestickSeries({
+          upColor: '#26a69a',
+          downColor: '#ef5350',
+          borderDownColor: '#ef5350',
+          borderUpColor: '#26a69a',
+          wickDownColor: '#ef5350',
+          wickUpColor: '#26a69a',
+        });
+
+        // Convert bars to chart format
+        const chartData = bars.map((bar: any) => ({
+          time: Math.floor(bar.time / 1000),
+          open: bar.open,
+          high: bar.high,
+          low: bar.low,
+          close: bar.close,
+        }));
+
+        candlestickSeries.setData(chartData);
+        chart.timeScale().fitContent();
+
+        setLoading(false);
+
+        // Handle resize
+        const handleResize = () => {
+          if (containerRef.current) {
+            chart.applyOptions({
+              width: containerRef.current.clientWidth,
+              height: containerRef.current.clientHeight,
+            });
+          }
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => {
+          window.removeEventListener('resize', handleResize);
+          chart.remove();
+        };
+      } catch (error) {
+        console.error('Error loading chart:', error);
+        setLoading(false);
       }
     };
 
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      chart.remove();
-    };
+    loadAndRender();
   }, [symbol, timeframe]);
 
   return (
     <div
       ref={containerRef}
-      className="flex-1 bg-tv-bg border-r border-tv-border overflow-hidden"
-    />
+      className="flex-1 bg-tv-bg border-r border-tv-border overflow-hidden relative"
+    >
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-tv-bg/80 z-10">
+          <div className="text-tv-text-secondary">Loading chart...</div>
+        </div>
+      )}
+    </div>
   );
 };

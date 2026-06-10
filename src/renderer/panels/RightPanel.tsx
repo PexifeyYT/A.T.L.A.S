@@ -5,9 +5,18 @@ type RightPanelTab = 'watchlist' | 'info' | 'analysis' | 'performance';
 interface RightPanelProps {
   activeTab: RightPanelTab;
   onTabChange: (tab: RightPanelTab) => void;
+  analysisResult?: any;
+  analysisLoading?: boolean;
+  analysisError?: string | null;
 }
 
-export const RightPanel: React.FC<RightPanelProps> = ({ activeTab, onTabChange }) => {
+export const RightPanel: React.FC<RightPanelProps> = ({
+  activeTab,
+  onTabChange,
+  analysisResult,
+  analysisLoading,
+  analysisError,
+}) => {
   const tabs: { id: RightPanelTab; label: string }[] = [
     { id: 'watchlist', label: 'Watchlist' },
     { id: 'info', label: 'Info' },
@@ -38,7 +47,13 @@ export const RightPanel: React.FC<RightPanelProps> = ({ activeTab, onTabChange }
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'watchlist' && <WatchlistContent />}
         {activeTab === 'info' && <InfoContent />}
-        {activeTab === 'analysis' && <AnalysisContent />}
+        {activeTab === 'analysis' && (
+          <AnalysisContent
+            result={analysisResult}
+            loading={analysisLoading}
+            error={analysisError}
+          />
+        )}
         {activeTab === 'performance' && <PerformanceContent />}
       </div>
     </div>
@@ -92,13 +107,93 @@ const InfoContent: React.FC = () => {
   );
 };
 
-const AnalysisContent: React.FC = () => {
-  return (
-    <div className="p-4 text-sm">
-      <div className="panel-header">ATLAS Analysis</div>
-      <div className="mt-4 text-tv-text-secondary">
-        <p>Run analysis to see AI predictions and strategy signals.</p>
+const AnalysisContent: React.FC<{
+  result?: any;
+  loading?: boolean;
+  error?: string | null;
+}> = ({ result, loading, error }) => {
+  if (loading) {
+    return (
+      <div className="p-4 text-sm">
+        <div className="panel-header">ATLAS Analysis</div>
+        <div className="mt-4 text-tv-text-secondary">Analyzing...</div>
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 text-sm">
+        <div className="panel-header">ATLAS Analysis</div>
+        <div className="mt-4 text-tv-red">Error: {error}</div>
+      </div>
+    );
+  }
+
+  if (!result) {
+    return (
+      <div className="p-4 text-sm">
+        <div className="panel-header">ATLAS Analysis</div>
+        <div className="mt-4 text-tv-text-secondary">
+          Click ANALYZE to run AI analysis on current chart.
+        </div>
+      </div>
+    );
+  }
+
+  const primary = result.primarySignal;
+  const confidence = (result.confidence || 0).toFixed(1);
+
+  return (
+    <div className="p-4 text-xs text-tv-text-secondary space-y-4 overflow-y-auto">
+      <div className="panel-header text-xs">ATLAS ANALYSIS</div>
+
+      <div>
+        <div className="text-tv-text font-semibold">📊 SIGNAL</div>
+        <div className={`text-lg font-bold ${primary.direction === 'LONG' ? 'text-tv-green' : primary.direction === 'SHORT' ? 'text-tv-red' : 'text-tv-text-secondary'}`}>
+          {primary.direction}
+        </div>
+        <div className="text-tv-text-secondary">{primary.explanation}</div>
+      </div>
+
+      <div>
+        <div className="text-tv-text font-semibold">🎯 TARGETS</div>
+        <div className="space-y-1">
+          <div>
+            Entry Zone: {primary.entryZone[0].toFixed(2)} - {primary.entryZone[1].toFixed(2)}
+          </div>
+          <div className="text-tv-green">Target 1: {primary.target1.toFixed(2)}</div>
+          {primary.target2 && <div className="text-tv-green">Target 2: {primary.target2.toFixed(2)}</div>}
+          <div className="text-tv-red">Invalidation: {primary.invalidation.toFixed(2)}</div>
+        </div>
+      </div>
+
+      <div>
+        <div className="text-tv-text font-semibold">🤖 CONVICTION</div>
+        <div className="text-tv-accent text-base font-bold">{confidence}/10</div>
+      </div>
+
+      <div>
+        <div className="text-tv-text font-semibold">✅ MODULES ({result.modulesAgreed?.length || 0})</div>
+        <div className="space-y-1">
+          {result.modulesAgreed?.map((mod: string) => (
+            <div key={mod} className="text-tv-green">
+              ✓ {mod}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {result.riskFlags && result.riskFlags.length > 0 && (
+        <div>
+          <div className="text-tv-text font-semibold">⚠️ RISK FLAGS</div>
+          <div className="space-y-1 text-tv-orange">
+            {result.riskFlags.map((flag: string, idx: number) => (
+              <div key={idx}>• {flag}</div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
