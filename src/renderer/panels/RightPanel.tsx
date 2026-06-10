@@ -169,44 +169,51 @@ const WatchlistContent: React.FC = () => {
 };
 
 const InfoContent: React.FC<{ symbol: string }> = ({ symbol }) => {
-  const symbolInfo: Record<string, any> = {
-    AAPL: { name: 'Apple Inc.', exchange: 'NASDAQ', sector: 'Technology', marketCap: '$3.2T', type: 'Stock', description: 'Consumer electronics, software, services.' },
-    MSFT: { name: 'Microsoft Corporation', exchange: 'NASDAQ', sector: 'Technology', marketCap: '$3.3T', type: 'Stock', description: 'Cloud computing, productivity software, gaming.' },
-    TSLA: { name: 'Tesla Inc.', exchange: 'NASDAQ', sector: 'Consumer Cyclical', marketCap: '$790B', type: 'Stock', description: 'Electric vehicles, energy storage, solar.' },
-    NVDA: { name: 'NVIDIA Corporation', exchange: 'NASDAQ', sector: 'Technology', marketCap: '$3.2T', type: 'Stock', description: 'GPUs, AI computing, data center.' },
-    SPY: { name: 'SPDR S&P 500 ETF', exchange: 'NYSE', sector: 'ETF', marketCap: '$560B', type: 'ETF', description: 'Tracks the S&P 500 index (500 large US companies).' },
-    QQQ: { name: 'Invesco QQQ Trust', exchange: 'NASDAQ', sector: 'ETF', marketCap: '$260B', type: 'ETF', description: 'Tracks the Nasdaq-100 index (top 100 non-financial).' },
-    'BTC-USD': { name: 'Bitcoin', exchange: 'Crypto', sector: 'Digital Asset', marketCap: '$1.3T', type: 'Crypto', description: 'Decentralized digital currency and store of value.' },
-    'ETH-USD': { name: 'Ethereum', exchange: 'Crypto', sector: 'Digital Asset', marketCap: '$430B', type: 'Crypto', description: 'Smart contract platform and programmable blockchain.' },
-    GOOGL: { name: 'Alphabet Inc.', exchange: 'NASDAQ', sector: 'Technology', marketCap: '$2.2T', type: 'Stock', description: 'Search, advertising, cloud, AI.' },
-    AMZN: { name: 'Amazon.com Inc.', exchange: 'NASDAQ', sector: 'Consumer Cyclical', marketCap: '$2.0T', type: 'Stock', description: 'E-commerce, cloud (AWS), advertising.' },
-    META: { name: 'Meta Platforms Inc.', exchange: 'NASDAQ', sector: 'Technology', marketCap: '$1.3T', type: 'Stock', description: 'Social media (Facebook, Instagram, WhatsApp), VR.' },
-    AMD: { name: 'Advanced Micro Devices', exchange: 'NASDAQ', sector: 'Technology', marketCap: '$250B', type: 'Stock', description: 'CPUs and GPUs for data centers, gaming, AI.' },
-  };
+  const [quote, setQuote] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const info = symbolInfo[symbol] || {
-    name: symbol, exchange: 'Unknown', sector: '—', marketCap: '—', type: 'Unknown', description: 'No info available.',
-  };
+  useEffect(() => {
+    setLoading(true);
+    window.api.fetchLiveQuote(symbol).then(r => {
+      if (r.success && r.data) setQuote(r.data);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [symbol]);
 
   const typeColor: Record<string, string> = {
-    Stock: 'text-tv-accent', ETF: 'text-tv-orange', Crypto: 'text-tv-green', Unknown: 'text-tv-text-secondary',
+    Stock: 'text-tv-accent', ETF: 'text-tv-orange', Crypto: 'text-tv-green',
+    Futures: 'text-tv-text-secondary', Forex: 'text-purple-400', Unknown: 'text-tv-text-secondary',
   };
+
+  const up = (quote?.changePercent ?? 0) >= 0;
 
   return (
     <div className="p-3 text-xs">
       <div className="mb-3">
-        <div className="text-lg font-bold text-tv-text">{symbol}</div>
-        <div className="text-tv-text-secondary">{info.name}</div>
-        <div className={`text-xs font-semibold mt-0.5 ${typeColor[info.type] ?? 'text-tv-text-secondary'}`}>
-          {info.type} · {info.exchange}
-        </div>
+        <div className="text-xl font-bold text-tv-text">{symbol}</div>
+        {loading ? (
+          <div className="text-tv-text-secondary animate-pulse mt-1">Loading...</div>
+        ) : quote ? (
+          <div className="mt-1 space-y-0.5">
+            <div className="text-2xl font-mono font-bold text-tv-text">
+              ${quote.price > 1000
+                ? quote.price.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                : quote.price.toFixed(2)}
+            </div>
+            <div className={`font-semibold ${up ? 'text-tv-green' : 'text-tv-red'}`}>
+              {up ? '+' : ''}{quote.change?.toFixed(2)} ({up ? '+' : ''}{quote.changePercent?.toFixed(2)}%)
+            </div>
+          </div>
+        ) : (
+          <div className="text-tv-text-secondary text-xs mt-1">Price unavailable</div>
+        )}
       </div>
+
       <div className="space-y-2 border-t border-tv-border pt-3">
         {[
-          ['Sector', info.sector],
-          ['Market Cap', info.marketCap],
-          ['Asset Type', info.type],
-          ['Exchange', info.exchange],
+          ['Symbol', symbol],
+          ['Data Source', 'Yahoo Finance'],
+          ['Status', quote ? 'Live' : 'No data'],
         ].map(([label, value]) => (
           <div key={label} className="flex justify-between">
             <span className="text-tv-text-secondary">{label}</span>
@@ -214,8 +221,10 @@ const InfoContent: React.FC<{ symbol: string }> = ({ symbol }) => {
           </div>
         ))}
       </div>
+
       <div className="mt-3 pt-3 border-t border-tv-border text-tv-text-secondary leading-relaxed">
-        {info.description}
+        Market data from Yahoo Finance. Analysis provided by ATLAS 13-module engine.
+        Run <span className="text-tv-accent">ANALYZE</span> for full signal generation.
       </div>
     </div>
   );
