@@ -27,9 +27,13 @@ export class AnalysisEngine {
     const bullishSignals = signals.filter((s) => s.direction === 'LONG');
     const bearishSignals = signals.filter((s) => s.direction === 'SHORT');
 
-    let strongestSignal = bullishSignals.length >= bearishSignals.length
-      ? bullishSignals.sort((a, b) => b.confidence - a.confidence)[0]
-      : bearishSignals.sort((a, b) => b.confidence - a.confidence)[0];
+    const weightedSum = (sigs: typeof signals) =>
+      sigs.reduce((sum, s) => sum + s.confidence * s.weight, 0);
+    const bullishWins = bullishSignals.length > bearishSignals.length ||
+      (bullishSignals.length === bearishSignals.length && weightedSum(bullishSignals) >= weightedSum(bearishSignals));
+    let strongestSignal = bullishWins
+      ? bullishSignals.sort((a, b) => b.confidence * b.weight - a.confidence * a.weight)[0]
+      : bearishSignals.sort((a, b) => b.confidence * b.weight - a.confidence * a.weight)[0];
 
     // Fall back to neutral signal if no directional signals
     if (!strongestSignal) {
