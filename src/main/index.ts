@@ -123,8 +123,12 @@ const createWindow = () => {
 app.on('ready', () => {
   try {
     initDatabase();
-    learningEngine.initializeWeights(allModuleNames, defaultWeights);
-    console.log('[ATLAS] Database initialized');
+    // Load persisted weights from DB; fall back to defaults for new modules
+    const persistedWeights = new Map(
+      allModuleNames.map(name => [name, getModuleWeight(name) ?? defaultWeights.get(name) ?? 1.0])
+    );
+    learningEngine.initializeWeights(allModuleNames, persistedWeights);
+    console.log('[ATLAS] Database initialized, weights loaded from DB');
   } catch (err) {
     console.error('[ATLAS] DB init failed:', err);
   }
