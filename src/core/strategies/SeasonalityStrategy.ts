@@ -20,9 +20,10 @@ export class SeasonalityStrategy implements IStrategyModule {
       return this.neutralSignal();
     }
 
-    const dayOfWeek = this.getCurrentDayOfWeek();
-    const monthlyPattern = this.getMonthlyPattern();
     const lastBar = bars[bars.length - 1];
+    const lastDate = new Date(lastBar.time);
+    const dayOfWeek = this.getDayOfWeek(lastDate);
+    const monthlyPattern = this.getMonthlyPattern(lastDate);
 
     // Monday effect (historically weaker)
     if (dayOfWeek === 'Monday' && monthlyPattern < 0) {
@@ -73,15 +74,14 @@ export class SeasonalityStrategy implements IStrategyModule {
     return 'Seasonality — Day-of-week tendencies, monthly OpEx, pre/post-earnings drift, turn-of-month effect';
   }
 
-  private getCurrentDayOfWeek(): string {
+  private getDayOfWeek(d: Date): string {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    return days[new Date().getDay()];
+    return days[d.getDay()];
   }
 
-  private getMonthlyPattern(): number {
-    // Simplified: months tend to start strong (turn-of-month effect)
-    const day = new Date().getDate();
-    if (day < 5) return 0.3; // Turn of month = bullish
+  private getMonthlyPattern(d: Date): number {
+    const day = d.getDate();
+    if (day < 5) return 0.3;  // Turn of month = bullish
     if (day > 25) return -0.2; // End of month = bearish
     return 0;
   }

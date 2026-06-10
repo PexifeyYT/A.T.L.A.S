@@ -14,14 +14,14 @@ export class SentimentStrategy implements IStrategyModule {
   name = 'mod_sentiment';
   weight = 0.85;
 
-  analyze(data: OHLCVData, context: MarketContext): StrategySignal {
+  analyze(data: OHLCVData, _context: MarketContext): StrategySignal {
     const bars = data.bars;
     if (bars.length < 20) {
       return this.neutralSignal();
     }
 
     // Simulate sentiment (Phase 6 will fetch real news)
-    const newsSentiment = this.simulateNewsSentiment(context.symbol);
+    const newsSentiment = this.simulateNewsSentiment(bars);
     const socialVolume = this.estimateSocialVolume(bars);
     const lastBar = bars[bars.length - 1];
 
@@ -74,22 +74,27 @@ export class SentimentStrategy implements IStrategyModule {
     return 'Sentiment — News NLP score, social mention volume, analyst consensus, earnings sentiment';
   }
 
-  private simulateNewsSentiment(symbol: string): number {
-    // Simulate sentiment (0-100 scale, 50 = neutral)
-    const hash = symbol.split('').reduce((h, c) => h + c.charCodeAt(0), 0);
-    return (hash % 100) / 100;
+  private simulateNewsSentiment(bars: any[]): number {
+    // Use 20-bar return + 5-bar momentum as sentiment proxy (0-1 scale, 0.5 = neutral)
+    if (bars.length < 20) return 0.5;
+    const close0 = bars[bars.length - 20].close;
+    const close5 = bars[bars.length - 5].close;
+    const closeLast = bars[bars.length - 1].close;
+    const r20 = (closeLast - close0) / close0; // -0.2 to +0.2 typical
+    const r5  = (closeLast - close5) / close5;
+    const raw = 0.5 + r20 * 1.5 + r5 * 1.0; // weight recent momentum more
+    return Math.max(0, Math.min(1, raw));
   }
 
   private estimateSocialVolume(bars: any[]): number {
-    // Estimate social volume based on price momentum
     const recent = bars.slice(-5);
-    const closes = recent.map((b) => b.close);
-
-    const upDays = closes.filter(
-      (c, idx) => idx === 0 || c > closes[idx - 1],
-    ).length;
-
-    return upDays > 2.5 ? 1 : upDays < 2.5 ? -1 : 0;
+    const closes = recent.map((b: any) => b.close);
+    let upDays = 0;
+    for (let i = 1; i < closes.length; i++) {
+      if (closes[i] > closes[i - 1]) upDays++;
+    }
+    // upDays is 0-4 out of 4 comparisons
+    return upDays >= 3 ? 1 : upDays <= 1 ? -1 : 0;
   }
 
   private neutralSignal(): StrategySignal {
