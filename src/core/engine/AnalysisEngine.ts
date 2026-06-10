@@ -72,7 +72,7 @@ export class AnalysisEngine {
         .filter((s) => s.direction === strongestSignal.direction)
         .map((s) => s.moduleName),
       keyLevels,
-      riskFlags: this.generateRiskFlags(context),
+      riskFlags: this.generateRiskFlags(context, canPublish ? strongestSignal.direction : undefined),
       prediction: {
         scenario1: {
           direction: strongestSignal.direction,
@@ -109,11 +109,23 @@ export class AnalysisEngine {
     }).sort((a, b) => b.strength - a.strength);
   }
 
-  private generateRiskFlags(context: MarketContext): string[] {
+  private generateRiskFlags(context: MarketContext, agreedDirection?: string): string[] {
     const flags: string[] = [];
 
     if (context.volatility > 0.7) {
-      flags.push('High volatility — widen stops');
+      flags.push('High volatility — widen stops by 1.5x ATR');
+    }
+
+    if (context.volatility < 0.1) {
+      flags.push('Low volatility squeeze — potential expansion imminent, size down');
+    }
+
+    if (agreedDirection === 'LONG' && context.macroTrend === 'DOWNTREND') {
+      flags.push('Counter-trend LONG vs macro downtrend — reduce position size');
+    }
+
+    if (agreedDirection === 'SHORT' && context.macroTrend === 'UPTREND') {
+      flags.push('Counter-trend SHORT vs macro uptrend — reduce position size');
     }
 
     return flags;
