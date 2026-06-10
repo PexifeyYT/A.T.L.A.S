@@ -33,6 +33,7 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
+  const analysisLinesRef = useRef<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [internalTool, setInternalTool] = useState<DrawingTool>('cursor');
@@ -230,50 +231,62 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({ symbol, timeframe, analy
     };
   }, [symbol, timeframe]);
 
-  // Draw analysis price lines when result changes
+  // Draw analysis price lines when result changes — clear previous ones first
   useEffect(() => {
-    if (!analysisResult || !candleSeriesRef.current) return;
+    if (!candleSeriesRef.current) return;
+
+    // Remove old analysis lines
+    try {
+      for (const line of analysisLinesRef.current) {
+        candleSeriesRef.current.removePriceLine(line);
+      }
+    } catch {}
+    analysisLinesRef.current = [];
+
+    if (!analysisResult) return;
     const sig = analysisResult.primarySignal;
     if (!sig || sig.direction === 'NEUTRAL') return;
 
     const bullish = sig.direction === 'LONG';
+    const newLines: any[] = [];
 
     try {
-      candleSeriesRef.current.createPriceLine({
+      newLines.push(candleSeriesRef.current.createPriceLine({
         price: sig.target1,
         color: '#26a69a',
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
         axisLabelVisible: true,
         title: 'T1',
-      });
+      }));
       if (sig.target2 && sig.target2 > 0) {
-        candleSeriesRef.current.createPriceLine({
+        newLines.push(candleSeriesRef.current.createPriceLine({
           price: sig.target2,
           color: '#26a69a',
           lineWidth: 1,
           lineStyle: LineStyle.Dashed,
           axisLabelVisible: true,
           title: 'T2',
-        });
+        }));
       }
-      candleSeriesRef.current.createPriceLine({
+      newLines.push(candleSeriesRef.current.createPriceLine({
         price: sig.invalidation,
         color: '#ef5350',
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
         axisLabelVisible: true,
         title: 'INV',
-      });
+      }));
       const entryMid = (sig.entryZone[0] + sig.entryZone[1]) / 2;
-      candleSeriesRef.current.createPriceLine({
+      newLines.push(candleSeriesRef.current.createPriceLine({
         price: entryMid,
         color: bullish ? '#26a69a' : '#ef5350',
         lineWidth: 2,
         lineStyle: LineStyle.Solid,
         axisLabelVisible: true,
         title: 'ENTRY',
-      });
+      }));
+      analysisLinesRef.current = newLines;
     } catch {
       // price lines may fail if chart was destroyed
     }
