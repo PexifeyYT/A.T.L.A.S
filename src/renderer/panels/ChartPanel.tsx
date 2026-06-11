@@ -338,27 +338,7 @@ export const ChartPanel = forwardRef<ChartPanelRef, ChartPanelProps>(({
     }
   }, [analysisResult]);
 
-  // ─── Prediction candles ───────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!predictionSeriesRef.current) return;
-    if (analysisResult?.predictionCandles && showPrediction && analysisResult.predictionCandles.length > 0) {
-      try {
-        predictionSeriesRef.current.setData(
-          analysisResult.predictionCandles.map(c => ({
-            time: c.time as any,
-            open: c.open, high: c.high, low: c.low, close: c.close,
-          }))
-        );
-        lastRealBarTimeRef.current = analysisResult.lastRealBarTime ?? null;
-      } catch {}
-    } else {
-      try { predictionSeriesRef.current.setData([]); } catch {}
-      if (!showPrediction) lastRealBarTimeRef.current = null;
-    }
-    redrawAll();
-  }, [analysisResult, showPrediction, redrawAll]);
-
-  // ─── Drawing overlay ─────────────────────────────────────────────────────────
+  // ─── Drawing overlay — must be declared before any useEffect that uses them ───
   const resizeOverlay = useCallback(() => {
     const canvas = overlayRef.current;
     const container = containerRef.current;
@@ -366,10 +346,6 @@ export const ChartPanel = forwardRef<ChartPanelRef, ChartPanelProps>(({
     canvas.width = container.clientWidth;
     canvas.height = container.clientHeight;
   }, []);
-
-  useEffect(() => {
-    resizeOverlay();
-  }, [resizeOverlay]);
 
   const redrawAll = useCallback(() => {
     const canvas = overlayRef.current;
@@ -519,6 +495,30 @@ export const ChartPanel = forwardRef<ChartPanelRef, ChartPanelProps>(({
       ctx.fillText(isLong ? '▲ Long' : '▼ Short', Math.min(x1,x2) + 4, entry - 4);
     }
   };
+
+  useEffect(() => {
+    resizeOverlay();
+  }, [resizeOverlay]);
+
+  // ─── Prediction candles ───────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!predictionSeriesRef.current) return;
+    if (analysisResult?.predictionCandles && showPrediction && analysisResult.predictionCandles.length > 0) {
+      try {
+        predictionSeriesRef.current.setData(
+          analysisResult.predictionCandles.map((c: any) => ({
+            time: c.time as any,
+            open: c.open, high: c.high, low: c.low, close: c.close,
+          }))
+        );
+        lastRealBarTimeRef.current = analysisResult.lastRealBarTime ?? null;
+      } catch {}
+    } else {
+      try { predictionSeriesRef.current.setData([]); } catch {}
+      if (!showPrediction) lastRealBarTimeRef.current = null;
+    }
+    redrawAll();
+  }, [analysisResult, showPrediction, redrawAll]);
 
   const getPrice = useCallback((y: number): number | undefined => {
     if (!chartRef.current || !candleSeriesRef.current) return undefined;
