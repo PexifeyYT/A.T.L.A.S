@@ -166,7 +166,19 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
       <div className="flex items-center h-[46px] px-3 bg-tv-surface border-b border-tv-border gap-1 select-none flex-shrink-0">
 
         {/* Logo */}
-        <div className="text-[13px] font-black text-tv-accent tracking-[0.15em] mr-2 shrink-0">ATLAS</div>
+        <div
+          className="mr-2 shrink-0 select-none"
+          style={{
+            fontFamily: 'Georgia, "Times New Roman", Times, serif',
+            fontSize: '17px',
+            fontWeight: '400',
+            color: '#d1d4dc',
+            letterSpacing: '0.12em',
+            lineHeight: 1,
+          }}
+        >
+          A.T.L.A.S
+        </div>
 
         {/* Separator */}
         <div className="h-5 w-px bg-tv-border mx-1 shrink-0" />
